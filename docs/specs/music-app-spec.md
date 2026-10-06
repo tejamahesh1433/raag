@@ -1,10 +1,11 @@
 # Raag — Product Requirements Document (Spec)
 
-**Status:** `in-progress` · **Created:** 2026-10-05 · **Updated:** 2026-10-06 · **Scope:** Local-first music server + free local AI (Ollama / LM Studio)
-**Brand:** Raag · **Access:** single-user open-access by default (`MUSIC_AUTH_REQUIRED=0`, no auth required); audio files never rewritten
-**Shipped:** M0–M5 core + power features — scan/stream/player, Subsonic/OpenSubsonic API compatibility (`/rest/*`), Web Audio 5-band Graphic Equalizer + presets, Crossfade, Song Radio queue generation, Library listening analytics & stats, playlists (manual + multi-rule smart, M3U export/import, drag-reorder), chat, embeddings, semantic search, similar tracks, plain+synced lyrics UI, genres/years/folders/recent browse, Organize (duplicates + enrichment only), wizard (incl. remote-access checklist), Media Session, sleep timer, volume normalize, scheduled rescan, optional ffmpeg transcoding, queue remove/reorder, playback persistence, DB restore, album enrichment display, global keyboard shortcuts (Space/←/→/L/M)
+**Status:** `shipped` · **Created:** 2026-10-05 · **Updated:** 2026-10-06 · **Scope:** Local-first music server + free local AI (Ollama / LM Studio)
+**Brand:** Raag · **Access:** single-user open-access by default (`MUSIC_AUTH_REQUIRED=0`); audio files never rewritten
+**Version:** `0.3.2` · **Host:** `https://music.tejainfo.xyz` (Cloudflare Tunnel on tejaserver)
+**Shipped:** M0–M5 core + power features — scan/stream/player, Subsonic/OpenSubsonic (`/rest/*` incl. star/unstar/scrobble), Web Audio EQ + crossfade + gapless dual-buffer, spectrum visualizer, Chromecast/AirPlay, stream quality bitrate, Last.fm/ListenBrainz + Discord webhooks, AcoustID/fpcalc, multi-disc album UI, Remote/listen-together WebSockets, PWA offline track downloads, Song Radio, listening analytics, playlists (manual + multi-rule smart, M3U, drag-reorder), chat, embeddings, semantic search, similar tracks, plain+synced lyrics, genres/years/folders/recent browse, Organize (duplicates + enrichment + AcoustID), wizard, Media Session, sleep timer, normalize, scheduled rescan, ffmpeg transcoding, queue remove/reorder, playback persistence, DB backup/restore, Windows→server music auto-sync scripts
 **Out of scope (product decision):** AI DJ / For You shelf, forced login, tag file writes
-**Next:** optional UX polish — DNS/Cloudflare Tunnel wizard, MusicBrainz rate-limit pacing
+**Next:** optional UX polish — live SMB mount helpers, MusicBrainz rate-limit pacing
 
 ---
 
