@@ -65,8 +65,9 @@ def content_fingerprint(
 
 
 def _path_score(path: Path) -> tuple[int, int, str]:
-    """Prefer artist/album nested layouts over flat dumps when deduping."""
-    return (len(path.parts), -len(str(path)), str(path).casefold())
+    """Prefer deeper artist/album layouts; on ties prefer the longer (more specific) path."""
+    text = str(path)
+    return (len(path.parts), len(text), text.casefold())
 
 
 def _under_any_root(path_str: str, roots: list[str]) -> bool:
@@ -259,11 +260,12 @@ def run_scan(db, roots: list[str], job: Job | None = None) -> dict:
 
     # Drop anything not kept under the configured roots, plus orphans outside roots.
     removed = 0
-    for track in db.query(Track).all():
+    for track in list(db.query(Track).all()):
         keep = track.path in seen_paths and _under_any_root(track.path, roots)
         if not keep:
             db.delete(track)
             removed += 1
+    db.flush()
 
     # Collapse leftover content duplicates (legacy rows / race leftovers).
     by_fp: dict[str, list[Track]] = {}
@@ -277,8 +279,7 @@ def run_scan(db, roots: list[str], job: Job | None = None) -> dict:
             db.delete(extra)
             skipped_dup += 1
             removed += 1
-
-    db.commit()
+    db.flush()
     summary = {
         "scanned": len(files),
         "added": added,
