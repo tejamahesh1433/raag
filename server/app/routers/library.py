@@ -473,10 +473,15 @@ def record_play(
     db.commit()
     try:
         from ..services.scrobble import scrobble_track
+        from ..services.discord_hook import notify_discord
 
         cfg_row = db.query(Setting).filter(Setting.key == "scrobble").first()
         cfg = json.loads(cfg_row.value) if cfg_row and cfg_row.value else {}
         scrobble_track(track, cfg if isinstance(cfg, dict) else {})
+
+        discord_row = db.query(Setting).filter(Setting.key == "discord").first()
+        discord_cfg = json.loads(discord_row.value) if discord_row and discord_row.value else {}
+        notify_discord(track, discord_cfg if isinstance(discord_cfg, dict) else {})
     except Exception:
         pass
     return MessageOut(message="played")

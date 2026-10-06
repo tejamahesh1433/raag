@@ -112,6 +112,11 @@ def _seed_settings() -> None:
                 "listenbrainz_token": "",
             },
         )
+        defaults.setdefault(
+            "discord",
+            {"enabled": False, "webhook_url": "", "content": "Now playing on Raag"},
+        )
+        defaults.setdefault("acoustid", {"api_key": ""})
         for key, value in defaults.items():
             if key not in existing:
                 s.add(Setting(key=key, value=json.dumps(value)))

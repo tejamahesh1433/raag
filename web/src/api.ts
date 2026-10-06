@@ -294,6 +294,21 @@ export const api = {
     request<Record<string, unknown>>(`/api/organization/enrichment/artist/${artistId}`),
   albumEnrichment: (albumId: number) =>
     request<Record<string, unknown>>(`/api/organization/enrichment/album/${albumId}`),
+  acoustidStatus: () =>
+    request<{ fpcalc_available: boolean }>("/api/organization/acoustid/status"),
+  acoustidIdentify: (trackId: number) =>
+    request<{
+      ok: boolean;
+      matches: Array<{ score: number; title: string; artist: string; album: string }>;
+      best?: { score: number; title: string; artist: string; album: string };
+      suggestion_id?: number;
+      error?: string;
+    }>(`/api/organization/acoustid/identify/${trackId}`, { method: "POST" }),
+  acoustidScan: (limit = 25) =>
+    request<{ job_id: number; status: string }>(
+      `/api/organization/acoustid/scan?limit=${limit}`,
+      { method: "POST" },
+    ),
   sessions: () =>
     request<Array<{ token: string; created_at: string; expires_at: string }>>("/api/auth/sessions"),
   revokeSession: (token: string) =>

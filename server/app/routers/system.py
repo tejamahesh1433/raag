@@ -50,12 +50,16 @@ def _get_settings(db: DbSession) -> SettingsOut:
         hours = 0
     transcode = bool(_setting_json(db, "transcode_enabled", False))
     scrobble = _setting_json(db, "scrobble", {})
+    discord = _setting_json(db, "discord", {})
+    acoustid = _setting_json(db, "acoustid", {})
     return SettingsOut(
         library_roots=roots if isinstance(roots, list) else [],
         ai=ai if isinstance(ai, dict) else {},
         scan_interval_hours=max(0, hours),
         transcode_enabled=transcode,
         scrobble=scrobble if isinstance(scrobble, dict) else {},
+        discord=discord if isinstance(discord, dict) else {},
+        acoustid=acoustid if isinstance(acoustid, dict) else {},
     )
 
 
@@ -70,6 +74,10 @@ def _save_settings(db: DbSession, payload: SettingsUpdate, current: SettingsOut)
         _upsert_setting(db, "transcode_enabled", bool(payload.transcode_enabled))
     if payload.scrobble is not None:
         _upsert_setting(db, "scrobble", {**current.scrobble, **payload.scrobble})
+    if payload.discord is not None:
+        _upsert_setting(db, "discord", {**current.discord, **payload.discord})
+    if payload.acoustid is not None:
+        _upsert_setting(db, "acoustid", {**current.acoustid, **payload.acoustid})
     db.commit()
     return _get_settings(db)
 

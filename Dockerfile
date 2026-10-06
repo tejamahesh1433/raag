@@ -15,6 +15,10 @@ ENV PYTHONUNBUFFERED=1 \
     MUSIC_PORT=8765 \
     MUSIC_COOKIE_SECURE=0
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg libchromaprint-tools \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY server/requirements.txt ./server/requirements.txt
 RUN pip install --no-cache-dir -r server/requirements.txt
 

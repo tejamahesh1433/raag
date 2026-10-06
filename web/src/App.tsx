@@ -7,6 +7,7 @@ import { ChatPage } from "./pages/Chat";
 import { FavoritesPage } from "./pages/Favorites";
 import { LibraryPage } from "./pages/Library";
 import { LoginPage } from "./pages/Login";
+import { RemotePage } from "./pages/Remote";
 import { OrganizePage } from "./pages/Organize";
 import { PlaylistDetailPage } from "./pages/PlaylistDetail";
 import { PlaylistsPage } from "./pages/Playlists";
@@ -78,6 +79,7 @@ export default function App() {
         <Route path="/playlists" element={<PlaylistsPage />} />
         <Route path="/playlists/:id" element={<PlaylistDetailPage />} />
         <Route path="/organize" element={<OrganizePage />} />
+        <Route path="/remote" element={<RemotePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/library" replace />} />
       </Route>

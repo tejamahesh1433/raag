@@ -5,6 +5,7 @@ import {
   IconHeart,
   IconLibrary,
   IconPlaylist,
+  IconPlay,
   IconSearch,
   IconSettings,
   IconSpark,
@@ -19,6 +20,7 @@ const navItems = [
   { to: "/favorites", label: "Saved", Icon: IconHeart },
   { to: "/playlists", label: "Sets", Icon: IconPlaylist },
   { to: "/organize", label: "Organize", Icon: IconMusic },
+  { to: "/remote", label: "Remote", Icon: IconPlay },
   { to: "/settings", label: "Settings", Icon: IconSettings },
 ];
 

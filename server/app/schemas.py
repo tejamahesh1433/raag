@@ -137,6 +137,8 @@ class SettingsOut(BaseModel):
     scan_interval_hours: int = 0
     transcode_enabled: bool = False
     scrobble: dict = {}
+    discord: dict = {}
+    acoustid: dict = {}
 
 
 class SettingsUpdate(BaseModel):
@@ -145,6 +147,8 @@ class SettingsUpdate(BaseModel):
     scan_interval_hours: int | None = Field(default=None, ge=0, le=168)
     transcode_enabled: bool | None = None
     scrobble: dict | None = None
+    discord: dict | None = None
+    acoustid: dict | None = None
 
 
 class LastfmAuthIn(BaseModel):

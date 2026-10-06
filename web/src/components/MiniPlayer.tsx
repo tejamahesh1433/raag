@@ -1,9 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { getAudio, isNormalizeOn, pauseAudio, setNormalize, stopAudio, ensureAnalyser } from "../audioEngine";
+import {
+  addAudioListener,
+  airPlayAvailable,
+  getAudio,
+  getCrossfade,
+  handoffTo,
+  isNormalizeOn,
+  pauseAudio,
+  playUrl,
+  preloadNext,
+  remainingTime,
+  setNormalize,
+  showAirPlayPicker,
+  stopAudio,
+  ensureAnalyser,
+  isGapless,
+} from "../audioEngine";
 import { SpectrumVisualizer } from "./SpectrumVisualizer";
 import { getStreamQuality, setStreamQuality, type StreamQuality } from "../lib/streamQuality";
 import { downloadTrack, isOffline, removeOfflineTrack } from "../lib/offline";
+import { absoluteUrl, castMedia, initCast, isCastAvailable } from "../lib/cast";
+import { publishState, onPartyMessage, getPartyMeta } from "../lib/party";
 import { usePlayer } from "../store/player";
 import type { Track } from "../types";
 import { Artwork } from "./Artwork";
@@ -55,6 +73,8 @@ export function MiniPlayer() {
   const queueDragIdx = useRef(-1);
   const [queueDragOver, setQueueDragOver] = useState(-1);
   const scrobbledRef = useRef<number | null>(null);
+  const handoffLock = useRef(false);
+  const skipLoadRef = useRef(false);
 
   const queue = usePlayer((s) => s.queue);
   const index = usePlayer((s) => s.index);
@@ -65,19 +85,23 @@ export function MiniPlayer() {
   const current = index >= 0 ? queue[index] ?? null : null;
   const upNext = current ? queue.slice(index + 1) : [];
 
-  // One shared Audio element — never create during render (causes ghost streams).
+  // Dual-buffer listeners — active element swaps during gapless handoff.
   useEffect(() => {
-    const audio = getAudio();
-    const onTime = () => setProgress(audio.currentTime);
-    const onMeta = () => setDuration(audio.duration || 0);
-    const onEnded = () => usePlayer.getState().next(true);
-    audio.addEventListener("timeupdate", onTime);
-    audio.addEventListener("loadedmetadata", onMeta);
-    audio.addEventListener("ended", onEnded);
+    initCast();
+    const onTime = () => setProgress(getAudio().currentTime);
+    const onMeta = () => setDuration(getAudio().duration || 0);
+    const onEnded = () => {
+      // Dual-buffer handoff owns advancement when gapless/crossfade is on.
+      if (isGapless() || getCrossfade() > 0) return;
+      usePlayer.getState().next(true);
+    };
+    const offTime = addAudioListener("timeupdate", onTime);
+    const offMeta = addAudioListener("loadedmetadata", onMeta);
+    const offEnded = addAudioListener("ended", onEnded);
     return () => {
-      audio.removeEventListener("timeupdate", onTime);
-      audio.removeEventListener("loadedmetadata", onMeta);
-      audio.removeEventListener("ended", onEnded);
+      offTime();
+      offMeta();
+      offEnded();
       pauseAudio();
       usePlayer.getState().setPlaying(false);
     };
@@ -90,15 +114,23 @@ export function MiniPlayer() {
       setDuration(0);
       return;
     }
-    const audio = getAudio();
-    audio.src = api.streamUrl(current.id);
-    audio.currentTime = 0;
-    setProgress(0);
-    if (playing) {
-      void audio.play().catch(() => usePlayer.getState().setPlaying(false));
-    } else {
-      audio.pause();
+    if (skipLoadRef.current) {
+      skipLoadRef.current = false;
+      const s = usePlayer.getState();
+      const nextTrack = s.queue[s.index + 1];
+      if (nextTrack) preloadNext(api.streamUrl(nextTrack.id));
+      return;
     }
+    const url = api.streamUrl(current.id);
+    void playUrl(url, 0)
+      .then(() => {
+        if (!usePlayer.getState().playing) pauseAudio();
+      })
+      .catch(() => usePlayer.getState().setPlaying(false));
+    setProgress(0);
+    const s = usePlayer.getState();
+    const nextTrack = s.queue[s.index + 1];
+    if (nextTrack) preloadNext(api.streamUrl(nextTrack.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id, playToken]);
 
@@ -111,6 +143,106 @@ export function MiniPlayer() {
       audio.pause();
     }
   }, [playing, current]);
+
+  // Gapless / crossfade handoff near the end
+  useEffect(() => {
+    if (!current || !playing) return;
+    handoffLock.current = false;
+    const tick = () => {
+      const s = usePlayer.getState();
+      const nextTrack = s.queue[s.index + 1];
+      if (!nextTrack) {
+        if (remainingTime() <= 0.05) usePlayer.getState().next(true);
+        return;
+      }
+      if (handoffLock.current) return;
+      const fade = getCrossfade();
+      const need = fade > 0 ? fade : isGapless() ? 0.35 : 0;
+      if (need <= 0) return;
+      const rem = remainingTime();
+      if (rem <= need + 0.05) {
+        handoffLock.current = true;
+        const url = api.streamUrl(nextTrack.id);
+        if (handoffTo(url)) {
+          skipLoadRef.current = true;
+          usePlayer.setState({ index: s.index + 1, playing: true });
+          const after = usePlayer.getState().queue[usePlayer.getState().index + 1];
+          if (after) preloadNext(api.streamUrl(after.id));
+        } else {
+          handoffLock.current = false;
+        }
+      } else if (rem < 20) {
+        preloadNext(api.streamUrl(nextTrack.id));
+      }
+    };
+    return addAudioListener("timeupdate", tick);
+  }, [current, playing]);
+
+  // Host publishes party state
+  useEffect(() => {
+    const meta = getPartyMeta();
+    if (meta.role !== "host") return;
+    const id = window.setInterval(() => {
+      const s = usePlayer.getState();
+      const cur = s.current();
+      publishState({
+        trackId: cur?.id ?? null,
+        title: cur?.title,
+        artist: cur?.artist,
+        playing: s.playing,
+        position: getAudio().currentTime || 0,
+        queueIds: s.queue.map((t) => t.id),
+        index: s.index,
+      });
+    }, 1500);
+    return () => clearInterval(id);
+  }, [current?.id, playing]);
+
+  // Listen for remote commands when hosting
+  useEffect(() => {
+    return onPartyMessage((msg) => {
+      if (msg.type !== "cmd") return;
+      const meta = getPartyMeta();
+      if (meta.role !== "host") return;
+      const player = usePlayer.getState();
+      const cmd = String(msg.cmd || "");
+      if (cmd === "toggle") player.toggle();
+      else if (cmd === "next") player.next();
+      else if (cmd === "prev") player.prev();
+      else if (cmd === "play") player.setPlaying(true);
+      else if (cmd === "pause") player.setPlaying(false);
+      else if (cmd === "seek") {
+        const t = Number((msg.payload as { t?: number })?.t);
+        if (Number.isFinite(t)) getAudio().currentTime = t;
+      }
+    });
+  }, []);
+
+  // Followers apply host state
+  useEffect(() => {
+    return onPartyMessage((msg) => {
+      if (msg.type !== "state") return;
+      const meta = getPartyMeta();
+      if (meta.role !== "listener") return;
+      const state = msg.state as {
+        trackId?: number;
+        playing?: boolean;
+        position?: number;
+        queueIds?: number[];
+        index?: number;
+      };
+      // Soft sync: only seek if drift is large; track changes via queue if present
+      if (typeof state.position === "number") {
+        const audio = getAudio();
+        if (Math.abs(audio.currentTime - state.position) > 2) {
+          audio.currentTime = state.position;
+        }
+      }
+      if (typeof state.playing === "boolean") {
+        usePlayer.getState().setPlaying(state.playing);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("mediaSession" in navigator) || !current) return;
@@ -546,6 +678,32 @@ export function MiniPlayer() {
                 >
                   {offlineSaved ? "Remove offline" : "Save offline"}
                 </button>
+                {isCastAvailable() && (
+                  <button
+                    type="button"
+                    className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] text-ink backdrop-blur-md hover:bg-white/12"
+                    onClick={() => {
+                      void castMedia({
+                        contentUrl: absoluteUrl(api.streamUrl(current.id)),
+                        title: current.title,
+                        subtitle: current.artist,
+                        imageUrl: artUrl ? absoluteUrl(artUrl) : undefined,
+                        currentTime: getAudio().currentTime,
+                      }).catch(() => undefined);
+                    }}
+                  >
+                    Cast
+                  </button>
+                )}
+                {airPlayAvailable() && (
+                  <button
+                    type="button"
+                    className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] text-ink backdrop-blur-md hover:bg-white/12"
+                    onClick={() => showAirPlayPicker()}
+                  >
+                    AirPlay
+                  </button>
+                )}
               </div>
 
               <div className="mt-6 w-full">

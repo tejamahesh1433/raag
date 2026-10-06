@@ -101,4 +101,12 @@ export interface Settings {
     listenbrainz_enabled?: boolean;
     listenbrainz_token?: string;
   };
+  discord?: {
+    enabled?: boolean;
+    webhook_url?: string;
+    content?: string;
+  };
+  acoustid?: {
+    api_key?: string;
+  };
 }

@@ -218,6 +218,155 @@ def album_enrichment(
     return info
 
 
+@router.get("/acoustid/status")
+def acoustid_status(_user: User = Depends(get_current_user)):
+    from ..services.acoustid import fpcalc_available
+
+    return {"fpcalc_available": fpcalc_available()}
+
+
+@router.post("/acoustid/identify/{track_id}")
+def acoustid_identify(
+    track_id: int,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Fingerprint a track and look up AcoustID matches (metadata only — no file writes)."""
+    from pathlib import Path
+
+    from ..models import Setting
+    from ..services.acoustid import identify_path
+
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only")
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    row = db.query(Setting).filter(Setting.key == "acoustid").first()
+    cfg = json.loads(row.value) if row and row.value else {}
+    api_key = (cfg.get("api_key") or "").strip()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Set AcoustID API key in Settings")
+    result = identify_path(Path(track.path), api_key)
+    best = result.get("best")
+    # Queue a tag suggestion when we have a confident match (review only).
+    if best and float(best.get("score") or 0) >= 0.7:
+        proposed = {
+            "title": best.get("title") or track.title,
+            "artist": best.get("artist") or track.artist_name,
+            "album": best.get("album") or track.album_title,
+        }
+        if best.get("year"):
+            proposed["year"] = best["year"]
+        original = {
+            "title": track.title,
+            "artist": track.artist_name,
+            "album": track.album_title,
+            "year": track.year,
+        }
+        sug = TagSuggestion(
+            track_id=track.id,
+            status="pending",
+            proposed=json.dumps(proposed),
+            original=json.dumps(original),
+            rationale=f"AcoustID match score {best.get('score'):.2f}",
+            created_at=utcnow(),
+        )
+        db.add(sug)
+        db.commit()
+        result["suggestion_id"] = sug.id
+    return result
+
+
+@router.post("/acoustid/scan", status_code=202)
+def acoustid_scan(
+    limit: int = Query(25, ge=1, le=100),
+    db: DbSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Background-identify poorly tagged tracks (Unknown / empty title/artist)."""
+    from pathlib import Path
+
+    from ..models import Setting
+    from ..services.acoustid import identify_path
+
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only")
+    row = db.query(Setting).filter(Setting.key == "acoustid").first()
+    cfg = json.loads(row.value) if row and row.value else {}
+    api_key = (cfg.get("api_key") or "").strip()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Set AcoustID API key in Settings")
+
+    job = Job(kind="acoustid", status="pending", progress=0, total=0, message="Queued")
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    job_id = job.id
+
+    def worker():
+        from ..db import SessionLocal
+
+        with SessionLocal() as s:
+            j = s.get(Job, job_id)
+            if not j:
+                return
+            j.status = "running"
+            candidates = (
+                s.query(Track)
+                .filter(
+                    (Track.title == "")
+                    | (Track.title == "Unknown")
+                    | (Track.artist_name == "")
+                    | (Track.artist_name == "Unknown Artist")
+                    | (Track.artist_name == "Unknown")
+                )
+                .limit(limit)
+                .all()
+            )
+            j.total = len(candidates)
+            j.message = f"Identifying {len(candidates)} tracks"
+            s.commit()
+            matched = 0
+            for i, track in enumerate(candidates):
+                result = identify_path(Path(track.path), api_key)
+                best = result.get("best")
+                if best and float(best.get("score") or 0) >= 0.7:
+                    proposed = {
+                        "title": best.get("title") or track.title,
+                        "artist": best.get("artist") or track.artist_name,
+                        "album": best.get("album") or track.album_title,
+                    }
+                    if best.get("year"):
+                        proposed["year"] = best["year"]
+                    sug = TagSuggestion(
+                        track_id=track.id,
+                        status="pending",
+                        proposed=json.dumps(proposed),
+                        original=json.dumps(
+                            {
+                                "title": track.title,
+                                "artist": track.artist_name,
+                                "album": track.album_title,
+                                "year": track.year,
+                            }
+                        ),
+                        rationale=f"AcoustID match score {best.get('score'):.2f}",
+                        created_at=utcnow(),
+                    )
+                    s.add(sug)
+                    matched += 1
+                j.progress = i + 1
+                j.message = f"{i + 1}/{len(candidates)} · {matched} matches"
+                s.commit()
+            j.status = "done"
+            j.message = f"Done — {matched} AcoustID suggestions"
+            s.commit()
+
+    threading.Thread(target=worker, daemon=True).start()
+    return {"job_id": job_id, "status": "pending"}
+
+
 @router.get("/setup-status")
 def setup_status(
     db: DbSession = Depends(get_db),

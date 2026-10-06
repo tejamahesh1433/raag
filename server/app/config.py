@@ -52,12 +52,13 @@ GUEST_USERNAME = "guest"
 # managed at runtime through PUT /api/settings.
 LIBRARY_ROOTS = _env_json_list("MUSIC_LIBRARY_ROOTS")
 FFMPEG_PATH = _env("MUSIC_FFMPEG_PATH", "ffmpeg")
+FPCALC_PATH = _env("MUSIC_FPCALC_PATH", "fpcalc")
 
 # AI (persisted in settings; gateway lands in M3) ---------------------------
-AI_PROVIDER = _env("MUSIC_AI_PROVIDER", "ollama")          # ollama | lm-studio | custom
-AI_BASE_URL = _env("MUSIC_AI_BASE_URL", "")               # empty = provider default
+AI_PROVIDER = _env("MUSIC_AI_PROVIDER", "ollama")  # ollama | lm-studio | custom
+AI_BASE_URL = _env("MUSIC_AI_BASE_URL", "")  # empty = provider default
 AI_CHAT_MODEL = _env("MUSIC_AI_CHAT_MODEL", "qwen2.5:7b-instruct")
 AI_EMBED_MODEL = _env("MUSIC_AI_EMBED_MODEL", "nomic-embed-text")
 AI_TAG_MODEL = _env("MUSIC_AI_TAG_MODEL", "")
 
-VERSION = "0.3.1"
+VERSION = "0.3.2"

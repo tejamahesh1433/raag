@@ -3,7 +3,7 @@ import { api } from "../api";
 import { Card, PageHeader, SegmentedControl } from "../components/ui";
 import type { Job } from "../types";
 
-type Tab = "duplicates" | "enrich";
+type Tab = "duplicates" | "enrich" | "acoustid";
 
 export function OrganizePage() {
   const [tab, setTab] = useState<Tab>("duplicates");
@@ -12,6 +12,7 @@ export function OrganizePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fpcalc, setFpcalc] = useState<boolean | null>(null);
 
   const loadDupes = async () => {
     setDupes((await api.duplicates()).groups);
@@ -19,6 +20,10 @@ export function OrganizePage() {
 
   useEffect(() => {
     void loadDupes().catch((e) => setError(String(e.message || e)));
+    void api
+      .acoustidStatus()
+      .then((s) => setFpcalc(s.fpcalc_available))
+      .catch(() => setFpcalc(false));
   }, []);
 
   const poll = async (jobId: number) => {
@@ -50,11 +55,25 @@ export function OrganizePage() {
     }
   };
 
+  const runAcoustid = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const { job_id } = await api.acoustidScan(25);
+      const j = await poll(job_id);
+      flash(j?.message || "AcoustID scan finished");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AcoustID scan failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-5 px-5 pb-10 sm:px-8">
       <PageHeader
         title="Organize"
-        subtitle="Duplicates · enrichment — your files stay untouched"
+        subtitle="Duplicates · enrichment · AcoustID — your files stay untouched"
         eyebrow="Library care"
       />
 
@@ -70,6 +89,7 @@ export function OrganizePage() {
         options={[
           { id: "duplicates", label: "Duplicates" },
           { id: "enrich", label: "Enrich" },
+          { id: "acoustid", label: "AcoustID" },
         ]}
       />
 
@@ -127,6 +147,28 @@ export function OrganizePage() {
             onClick={() => void runEnrich()}
           >
             Run enrichment batch
+          </button>
+        </Card>
+      )}
+
+      {tab === "acoustid" && (
+        <Card>
+          <p className="mb-4 text-xs text-muted">
+            Fingerprint poorly tagged tracks with Chromaprint and look up AcoustID. Matches become
+            pending suggestions only — nothing is written to your files. Set your API key in
+            Settings first.
+          </p>
+          <p className="mb-3 text-xs text-muted">
+            fpcalc:{" "}
+            {fpcalc === null ? "…" : fpcalc ? "available" : "not found on PATH"}
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy || fpcalc === false}
+            onClick={() => void runAcoustid()}
+          >
+            Scan unknown tracks
           </button>
         </Card>
       )}

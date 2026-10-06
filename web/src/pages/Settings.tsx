@@ -6,8 +6,10 @@ import { useAuth } from "../store/auth";
 import {
   getCrossfade,
   getEqPreset,
+  isGapless,
   setCrossfade,
   setEqPreset,
+  setGapless,
   type EqPreset,
 } from "../audioEngine";
 import { getStreamQuality, setStreamQuality, type StreamQuality } from "../lib/streamQuality";
@@ -34,6 +36,11 @@ export function SettingsPage() {
   const [lfmPass, setLfmPass] = useState("");
   const [lbEnabled, setLbEnabled] = useState(false);
   const [lbToken, setLbToken] = useState("");
+  const [discordEnabled, setDiscordEnabled] = useState(false);
+  const [discordUrl, setDiscordUrl] = useState("");
+  const [discordContent, setDiscordContent] = useState("Now playing on Raag");
+  const [acoustidKey, setAcoustidKey] = useState("");
+  const [gaplessOn, setGaplessOn] = useState(isGapless());
   const [scanJob, setScanJob] = useState<Job | null>(null);
   const [embedJob, setEmbedJob] = useState<Job | null>(null);
   const [embedStatus, setEmbedStatus] = useState<{
@@ -66,6 +73,11 @@ export function SettingsPage() {
       setLfmSession(sc.lastfm_session_key ?? "");
       setLbEnabled(Boolean(sc.listenbrainz_enabled));
       setLbToken(sc.listenbrainz_token ?? "");
+      const d = s.discord ?? {};
+      setDiscordEnabled(Boolean(d.enabled));
+      setDiscordUrl(d.webhook_url ?? "");
+      setDiscordContent(d.content ?? "Now playing on Raag");
+      setAcoustidKey(s.acoustid?.api_key ?? "");
       setDetail(await api.healthDetail());
       try {
         setEmbedStatus(await api.discoveryStatus());
@@ -454,10 +466,101 @@ export function SettingsPage() {
       </Card>
 
       <Card>
+        <h2 className="mb-1 text-sm font-semibold text-ink">Discord webhook</h2>
+        <p className="mb-3 text-xs text-muted">
+          Post now-playing embeds when a listen is scrobbled (50% / 4 min).
+        </p>
+        <label className="mb-2 flex items-center gap-2 text-xs text-muted">
+          <input
+            type="checkbox"
+            checked={discordEnabled}
+            onChange={(e) => setDiscordEnabled(e.target.checked)}
+          />
+          Enable Discord notifications
+        </label>
+        <input
+          className="input mb-2"
+          placeholder="https://discord.com/api/webhooks/…"
+          value={discordUrl}
+          onChange={(e) => setDiscordUrl(e.target.value)}
+        />
+        <input
+          className="input mb-3"
+          placeholder="Message content"
+          value={discordContent}
+          onChange={(e) => setDiscordContent(e.target.value)}
+        />
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() =>
+            void api
+              .saveSettings({
+                discord: {
+                  enabled: discordEnabled,
+                  webhook_url: discordUrl,
+                  content: discordContent,
+                },
+              })
+              .then((s) => {
+                setSettings(s);
+                flash("Discord settings saved");
+              })
+              .catch((err) => setError(err instanceof Error ? err.message : "Save failed"))
+          }
+        >
+          Save Discord settings
+        </button>
+      </Card>
+
+      <Card>
+        <h2 className="mb-1 text-sm font-semibold text-ink">AcoustID</h2>
+        <p className="mb-3 text-xs text-muted">
+          Acoustic fingerprinting for untagged tracks (needs{" "}
+          <code className="text-ink">fpcalc</code> / chromaprint). Suggestions only — files are never
+          rewritten.
+        </p>
+        <input
+          className="input mb-3"
+          placeholder="AcoustID API key"
+          type="password"
+          value={acoustidKey}
+          onChange={(e) => setAcoustidKey(e.target.value)}
+        />
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() =>
+            void api
+              .saveSettings({ acoustid: { api_key: acoustidKey } })
+              .then((s) => {
+                setSettings(s);
+                flash("AcoustID key saved");
+              })
+              .catch((err) => setError(err instanceof Error ? err.message : "Save failed"))
+          }
+        >
+          Save AcoustID key
+        </button>
+      </Card>
+
+      <Card>
         <h2 className="mb-1 text-sm font-semibold text-ink">Audio Equalizer & Crossfade</h2>
         <p className="mb-3 text-xs text-muted">
           Fine-tune frequency curves using Web Audio DSP and set track crossfade durations.
         </p>
+        <label className="mb-3 flex items-center gap-2 text-xs text-muted">
+          <input
+            type="checkbox"
+            checked={gaplessOn}
+            onChange={(e) => {
+              setGaplessOn(e.target.checked);
+              setGapless(e.target.checked);
+              flash(e.target.checked ? "Gapless on" : "Gapless off");
+            }}
+          />
+          Gapless / pre-buffer next track
+        </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-xs text-muted">
             EQ Preset
