@@ -63,7 +63,7 @@ try {
     Write-Log "Uploaded $uploaded file(s); triggering library scan"
     ssh -o BatchMode=yes $Remote "curl -sS -X POST http://127.0.0.1:8765/api/library/scan >/dev/null" 2>$null
   } else {
-    Write-Log "OK — already in sync ($($localFiles.Count) local audio files)"
+    Write-Log "OK - already in sync ($($localFiles.Count) local audio files)"
   }
   exit 0
 } catch {
