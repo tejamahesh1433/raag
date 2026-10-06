@@ -6,6 +6,7 @@ import { ArtistPage } from "./pages/Artist";
 import { ChatPage } from "./pages/Chat";
 import { FavoritesPage } from "./pages/Favorites";
 import { LibraryPage } from "./pages/Library";
+import { LoginPage } from "./pages/Login";
 import { OrganizePage } from "./pages/Organize";
 import { PlaylistDetailPage } from "./pages/PlaylistDetail";
 import { PlaylistsPage } from "./pages/Playlists";
@@ -16,7 +17,7 @@ import { api } from "./api";
 import { useAuth } from "./store/auth";
 
 export default function App() {
-  const { user, loading, init } = useAuth();
+  const { user, loading, setupRequired, serverReachable, init } = useAuth();
   const [needsWizard, setNeedsWizard] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -48,12 +49,16 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  if (!serverReachable) {
     return (
       <div className="flex h-full items-center justify-center text-muted">
         Unable to reach Raag. Is the server running?
       </div>
     );
+  }
+
+  if (!user) {
+    return <LoginPage mustSetup={setupRequired} />;
   }
 
   if (needsWizard) {

@@ -62,7 +62,21 @@ interface Page<T> {
 
 export const api = {
   // auth
+  setupRequired: () =>
+    request<{ required: boolean; auth_required: boolean }>("/api/auth/setup-required"),
+  setup: (username: string, password: string) =>
+    request<User>("/api/auth/setup", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+  login: (username: string, password: string) =>
+    request<User>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+  logout: () => request<{ message: string }>("/api/auth/logout", { method: "POST" }),
   me: () => request<User>("/api/auth/me"),
+
 
   // library
   tracks: (params: {
