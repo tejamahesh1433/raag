@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #0a0a0c;
+  --color-surface-2: #101014;
+  --color-panel: #16161c;
+  --color-panel-2: #1e1e26;
+  --color-border: #2a2a34;
+  --color-border-subtle: #1f1f28;
+  --color-accent: #c9a66b;
+  --color-accent-bright: #e4c08a;
+  --color-accent-dim: #6b5434;
+  --color-ink: #f2efe8;
+  --color-muted: #8b8792;
+  --font-display: "Instrument Serif", "Georgia", serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-surface);
+  background-image:
+    radial-gradient(ellipse 100% 80% at 50% -30%, rgba(201, 166, 107, 0.14), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(80, 70, 120, 0.08), transparent),
+    linear-gradient(180deg, var(--color-surface-2) 0%, var(--color-surface) 40%);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a48 transparent;
+}
+
+audio {
+  display: none;
+}
+
+/* —— Buttons & inputs —— */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200;
+}
+.btn-primary {
+  @apply bg-accent text-surface shadow-[0_0_0_1px_rgba(201,166,107,0.3)] hover:bg-accent-bright hover:shadow-[0_4px_24px_rgba(201,166,107,0.25)] disabled:opacity-45;
+}
+.btn-secondary {
+  @apply border border-border bg-panel/80 text-ink backdrop-blur hover:border-accent-dim hover:bg-panel-2;
+}
+.btn-ghost {
+  @apply text-muted hover:bg-panel-2 hover:text-ink disabled:opacity-45;
+}
+.btn-icon {
+  @apply flex h-10 w-10 items-center justify-center rounded-full text-muted transition-colors hover:bg-panel-2 hover:text-ink;
+}
+.btn-icon-active {
+  @apply text-accent;
+}
+
+.input {
+  @apply w-full rounded-xl border border-border bg-panel/90 px-4 py-2.5 text-sm text-ink shadow-inner
+    placeholder:text-muted/80 focus:border-accent-dim focus:outline-none focus:ring-2 focus:ring-accent/20;
+}
+
+/* —— Layout chrome —— */
+.page-header {
+  @apply sticky top-0 z-10 flex flex-wrap items-end justify-between gap-4 border-b border-border-subtle bg-surface/80 px-5 py-6 backdrop-blur-md sm:px-8;
+}
+
+.eyebrow {
+  @apply mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-accent-dim;
+}
+
+.section-label {
+  @apply px-5 pb-3 pt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted sm:px-8;
+}
+
+.segmented {
+  @apply mb-6 inline-flex rounded-full border border-border-subtle bg-panel/60 p-1;
+}
+.segmented-item {
+  @apply rounded-full px-4 py-1.5 text-sm text-muted transition-colors;
+}
+.segmented-item-active {
+  @apply bg-panel-2 text-ink shadow-sm;
+}
+
+.card {
+  @apply rounded-2xl border border-border-subtle bg-panel/70 p-5 backdrop-blur-sm;
+}
+
+.empty-state {
+  @apply mx-auto max-w-md px-6 py-16 text-center text-sm leading-relaxed text-muted;
+}
+
+/* —— Track list —— */
+.track-table-header {
+  @apply hidden grid-cols-[2.5rem_1fr_4rem_4rem] gap-3 border-b border-border-subtle px-5 py-2 text-[11px] font-medium uppercase tracking-wider text-muted sm:grid sm:px-8 lg:grid-cols-[2.5rem_3rem_1fr_4rem_4rem_6rem];
+}
+
+.track-row {
+  @apply grid grid-cols-[2.5rem_1fr_auto] items-center gap-3 rounded-xl px-3 py-2 transition-colors sm:px-5 lg:grid-cols-[2.5rem_3rem_1fr_4rem_4rem_6rem] lg:px-8;
+}
+.track-row:hover {
+  @apply bg-panel/50;
+}
+.track-row-active {
+  @apply bg-panel-2/80;
+}
+
+/* —— Player dock —— */
+.player-dock {
+  @apply fixed inset-x-0 z-20 border-t border-border-subtle bg-panel/95 shadow-[0_-8px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl lg:left-60;
+}
+
+.login-shell {
+  @apply relative flex min-h-full items-center justify-center overflow-hidden p-6;
+}
+.login-shell::before {
+  content: "";
+  @apply pointer-events-none absolute inset-0 opacity-40;
+  background: radial-gradient(circle at 30% 20%, rgba(201, 166, 107, 0.35), transparent 45%);
+}

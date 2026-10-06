@@ -1,0 +1,59 @@
+# Local Music Server — one command: docker compose up -d
+# Audio library is bind-mounted read-write (tag writes + scanning).
+services:
+  music:
+    build: .
+    container_name: music-server
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    environment:
+      # Set to 1 when serving over HTTPS (behind Caddy)
+      MUSIC_COOKIE_SECURE: "0"
+      # First-run admin (change these! remove after first login if you prefer)
+      MUSIC_ADMIN_USER: "${MUSIC_ADMIN_USER:-}"
+      MUSIC_ADMIN_PASSWORD: "${MUSIC_ADMIN_PASSWORD:-}"
+      # Optional: seed library folders at first boot (also settable in the UI)
+      MUSIC_LIBRARY_ROOTS: '${MUSIC_LIBRARY_ROOTS:-}'
+    volumes:
+      - music-data:/data
+      # >>> EDIT THIS: your music folder on the host <<<
+      - ${MUSIC_LIBRARY_HOST_PATH:-./demo-library}:/music:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Optional local AI — uncomment to run Ollama alongside the music server.
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: music-ollama
+  #   restart: unless-stopped
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama-models:/root/.ollama
+  #   # Uncomment for NVIDIA GPU hosts:
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: all
+  #   #           capabilities: [gpu]
+
+  # Optional HTTPS reverse proxy for music.tejainfo.xyz — see docs/deploy.md
+  # caddy:
+  #   image: caddy:2
+  #   restart: unless-stopped
+  #   ports: ["80:80", "443:443"]
+  #   volumes:
+  #     - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy-data:/data
+  #   depends_on: [music]
+
+volumes:
+  music-data:
+  # ollama-models:
+  # caddy-data:

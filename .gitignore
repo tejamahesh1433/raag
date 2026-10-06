@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Data / media (never commit personal library or DB)
+data/
+*.db
+*.db-wal
+*.db-shm
+demo-library/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Tool runtime state (never commit)
+.claude-flow/
+.claude/proven-config.json
+.claude/.proven-config-version
+.claude/settings.local.json
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env

@@ -1,0 +1,21 @@
+# music.tejainfo.xyz — automatic HTTPS via Let's Encrypt (free)
+# Point DNS for music.tejainfo.xyz at this machine's public IP first.
+
+music.tejainfo.xyz {
+	encode gzip
+
+	# Proxy everything to the music server (single process serves API + SPA)
+	reverse_proxy music:8765
+
+	# Sensible limits for a public endpoint
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+	}
+
+	# Basic rate limiting on the whole site
+	request_body {
+		max_size 1MB
+	}
+}
