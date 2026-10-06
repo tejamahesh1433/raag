@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { Playlist, Track } from "../types";
 import { usePlayer } from "../store/player";
@@ -26,6 +26,7 @@ export function TrackList({
   artworkByAlbumId,
   onRemoved,
   onRemove,
+  onReorder,
 }: {
   tracks: Track[];
   showArtwork?: boolean;
@@ -33,11 +34,14 @@ export function TrackList({
   artworkByAlbumId?: Record<number, number | null>;
   onRemoved?: (trackId: number) => void;
   onRemove?: (trackId: number) => void;
+  onReorder?: (from: number, to: number) => void;
 }) {
   const currentTrack = usePlayer((s) => (s.index >= 0 ? s.queue[s.index] ?? null : null));
   const playing = usePlayer((s) => s.playing);
   const [playlists, setPlaylists] = useState<Playlist[] | null>(null);
   const [menuFor, setMenuFor] = useState<number | null>(null);
+  const dragIdx = useRef(-1);
+  const [dragOver, setDragOver] = useState(-1);
 
   useEffect(() => {
     if (menuFor !== null && playlists === null) {
@@ -77,11 +81,32 @@ export function TrackList({
           return (
             <div
               key={`${track.id}-${i}`}
-              className={`track-row group/track ${isCurrent ? "track-row-active" : ""}`}
+              draggable={!!onReorder}
+              className={`track-row group/track ${isCurrent ? "track-row-active" : ""} ${
+                onReorder ? "cursor-grab active:cursor-grabbing" : ""
+              } ${dragOver === i && dragIdx.current !== i ? "ring-1 ring-inset ring-accent/40" : ""}`}
+              onDragStart={(e) => {
+                dragIdx.current = i;
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(e) => {
+                if (!onReorder) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                if (dragIdx.current !== i) setDragOver(i);
+              }}
+              onDragLeave={() => setDragOver(-1)}
+              onDrop={() => {
+                const from = dragIdx.current;
+                if (from !== -1 && from !== i) onReorder?.(from, i);
+                dragIdx.current = -1;
+                setDragOver(-1);
+              }}
+              onDragEnd={() => { dragIdx.current = -1; setDragOver(-1); }}
             >
               <button
                 type="button"
-                className="flex h-9 w-9 shrink-0 items-center justify-center font-mono text-xs tabular-nums text-muted transition-colors hover:border-2 hover:border-ink hover:bg-accent hover:text-ink"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs tabular-nums text-muted transition-colors hover:bg-white/10 hover:text-ink"
                 onClick={() => usePlayer.getState().playNow(tracks, i)}
                 title="Play"
               >
@@ -105,11 +130,11 @@ export function TrackList({
 
               <div className="min-w-0 flex-1">
                 <div
-                  className={`truncate text-sm font-semibold ${isCurrent ? "text-ink underline decoration-2" : "text-ink"}`}
+                  className={`truncate ${isCurrent ? "track-title-active" : "track-title text-ink"}`}
                 >
                   {track.title}
                 </div>
-                <div className="truncate font-mono text-[11px] uppercase tracking-wide text-muted">
+                <div className="meta-line truncate">
                   {track.artist}
                   {showAlbum ? ` · ${track.album}` : ""}
                 </div>
@@ -127,7 +152,7 @@ export function TrackList({
                   type="button"
                   className={`btn-icon !h-9 !w-9 ${
                     track.is_favorite
-                      ? "!border-ink !bg-signal !text-panel"
+                      ? "!bg-accent/20 !text-accent-bright"
                       : "opacity-0 [.track-row:hover_&]:opacity-100 sm:opacity-100"
                   }`}
                   onClick={() => void toggleFavorite(track)}
@@ -166,15 +191,15 @@ export function TrackList({
                     <IconMore size={18} />
                   </button>
                   {menuFor === track.id && (
-                    <div className="absolute right-0 top-10 z-40 w-52 border-2 border-ink bg-panel-2 p-1.5 shadow-[4px_4px_0_0_var(--color-ink)]">
+                    <div className="absolute right-0 top-10 z-40 w-52 rounded-2xl border border-border bg-panel-2 p-1.5 shadow-2xl">
                       {playlists === null && (
-                        <div className="px-2 py-2 font-mono text-xs text-muted">Loading…</div>
+                        <div className="px-2 py-2 text-xs text-muted">Loading…</div>
                       )}
                       {playlists?.map((pl) => (
                         <button
                           key={pl.id}
                           type="button"
-                          className="flex w-full items-center gap-2 truncate px-2 py-2 text-left text-xs hover:bg-accent"
+                          className="flex w-full items-center gap-2 truncate rounded-xl px-2 py-2 text-left text-xs hover:bg-white/8"
                           onClick={async () => {
                             await api.addToPlaylist(pl.id, [track.id]);
                             setMenuFor(null);
@@ -182,13 +207,13 @@ export function TrackList({
                           }}
                         >
                           {pl.kind !== "manual" && (
-                            <IconSpark size={14} className="shrink-0 text-signal" />
+                            <IconSpark size={14} className="shrink-0 text-accent-bright" />
                           )}
                           {pl.name}
                         </button>
                       ))}
                       {playlists?.length === 0 && (
-                        <div className="px-2 py-2 font-mono text-xs text-muted">No playlists yet</div>
+                        <div className="px-2 py-2 text-xs text-muted">No playlists yet</div>
                       )}
                     </div>
                   )}

@@ -30,3 +30,10 @@ Thumbs.db
 
 # Secrets
 .env
+
+# Local tooling / codegen noise
+.serena/
+graphify-out/
+
+# Design-demo audio (local preview only; keep out of git)
+docs/design-demos/media/*.m4a

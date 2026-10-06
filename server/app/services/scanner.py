@@ -298,6 +298,6 @@ def run_scan(db, roots: list[str], job: Job | None = None) -> dict:
             + (f", {skipped_dup} duplicates skipped" if skipped_dup else "")
         )
         job.updated_at = utcnow()
-        db.commit()
+    db.commit()
     log.info("scan summary: %s", summary)
     return summary

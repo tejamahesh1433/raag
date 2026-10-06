@@ -4,7 +4,7 @@ import platform
 import shutil
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session as DbSession
 
 from .. import config
@@ -12,6 +12,7 @@ from ..deps import get_current_user, get_db
 from ..models import Job, Setting, Track, User
 from ..schemas import JobOut, MessageOut, SettingsOut, SettingsUpdate
 from ..services.scanner import normalize_library_roots
+from ..services.streaming import ffmpeg_available
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -21,28 +22,50 @@ AI_DEFAULT_URLS = {
 }
 
 
+def _setting_json(db: DbSession, key: str, default):
+    row = db.query(Setting).filter(Setting.key == key).first()
+    if not row or row.value in (None, ""):
+        return default
+    try:
+        return json.loads(row.value)
+    except json.JSONDecodeError:
+        return default
+
+
+def _upsert_setting(db: DbSession, key: str, value) -> None:
+    setting = db.query(Setting).filter(Setting.key == key).first()
+    if setting is None:
+        setting = Setting(key=key)
+        db.add(setting)
+    setting.value = json.dumps(value)
+
+
 def _get_settings(db: DbSession) -> SettingsOut:
-    rows = {s.key: s for s in db.query(Setting).all()}
-    roots = json.loads(rows["library_roots"].value) if "library_roots" in rows else []
-    ai = json.loads(rows["ai"].value) if "ai" in rows else {}
-    return SettingsOut(library_roots=roots, ai=ai)
+    roots = _setting_json(db, "library_roots", [])
+    ai = _setting_json(db, "ai", {})
+    hours = _setting_json(db, "scan_interval_hours", 0)
+    try:
+        hours = int(hours)
+    except (TypeError, ValueError):
+        hours = 0
+    transcode = bool(_setting_json(db, "transcode_enabled", False))
+    return SettingsOut(
+        library_roots=roots if isinstance(roots, list) else [],
+        ai=ai if isinstance(ai, dict) else {},
+        scan_interval_hours=max(0, hours),
+        transcode_enabled=transcode,
+    )
 
 
 def _save_settings(db: DbSession, payload: SettingsUpdate, current: SettingsOut) -> SettingsOut:
     if payload.library_roots is not None:
-        setting = db.query(Setting).filter(Setting.key == "library_roots").first()
-        if setting is None:
-            setting = Setting(key="library_roots")
-            db.add(setting)
-        # Resolve, uniquify, drop nested roots so the same songs aren't scanned twice.
-        setting.value = json.dumps(normalize_library_roots(payload.library_roots))
+        _upsert_setting(db, "library_roots", normalize_library_roots(payload.library_roots))
     if payload.ai is not None:
-        merged = {**current.ai, **payload.ai}
-        setting = db.query(Setting).filter(Setting.key == "ai").first()
-        if setting is None:
-            setting = Setting(key="ai")
-            db.add(setting)
-        setting.value = json.dumps(merged)
+        _upsert_setting(db, "ai", {**current.ai, **payload.ai})
+    if payload.scan_interval_hours is not None:
+        _upsert_setting(db, "scan_interval_hours", int(payload.scan_interval_hours))
+    if payload.transcode_enabled is not None:
+        _upsert_setting(db, "transcode_enabled", bool(payload.transcode_enabled))
     db.commit()
     return _get_settings(db)
 
@@ -126,6 +149,9 @@ def health_detail(db: DbSession = Depends(get_db), user: User = Depends(get_curr
         "last_scan": JobOut.model_validate(last_scan) if last_scan else None,
         "ai": ai_status,
         "library_roots": settings.library_roots,
+        "scan_interval_hours": settings.scan_interval_hours,
+        "transcode_enabled": settings.transcode_enabled,
+        "ffmpeg_available": ffmpeg_available(),
     }
 
 
@@ -146,3 +172,43 @@ def backup_db(user: User = Depends(get_current_user)):
     src.close()
     dst.close()
     return MessageOut(message=f"backup written to {backup_path.name}")
+
+
+@router.post("/settings/restore", response_model=MessageOut)
+async def restore_db(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only")
+    if not file.filename or not file.filename.endswith(".db"):
+        raise HTTPException(status_code=400, detail="Must be a .db file")
+    import sqlite3, tempfile, os
+    from pathlib import Path as FSPath
+
+    # Write upload to a temp file, validate it's a SQLite DB, then copy over live DB
+    data = await file.read()
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        tmp.write(data)
+        tmp_path = FSPath(tmp.name)
+    try:
+        # Validate: try opening as SQLite
+        conn = sqlite3.connect(str(tmp_path))
+        conn.execute("SELECT name FROM sqlite_master LIMIT 1")
+        conn.close()
+        # Atomic replace: backup current, then copy upload over it
+        import sqlite3 as _sq
+        src = _sq.connect(str(tmp_path))
+        dst = _sq.connect(str(config.DB_PATH))
+        with dst:
+            src.backup(dst)
+        src.close()
+        dst.close()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid database file: {exc}") from exc
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+    return MessageOut(message="Database restored. Restart the server to reload all caches.")

@@ -125,6 +125,27 @@ describe("player queue", () => {
     expect(new Set(s.queue.map((t) => t.id)).size).toBe(3);
   });
 
+  it("playNow respects shuffle and put current first", () => {
+    reset();
+    usePlayer.setState({ shuffle: true });
+    usePlayer.getState().playNow(tracks, 2);
+    const s = usePlayer.getState();
+    expect(s.shuffle).toBe(true);
+    expect(s.index).toBe(0);
+    expect(s.queue[0].id).toBe(3);
+    expect(new Set(s.queue.map((t) => t.id)).size).toBe(3);
+  });
+
+  it("disabling shuffle keeps order", () => {
+    reset();
+    usePlayer.getState().playNow(tracks, 0);
+    usePlayer.getState().toggleShuffle();
+    const order = usePlayer.getState().queue.map((t) => t.id);
+    usePlayer.getState().toggleShuffle();
+    expect(usePlayer.getState().shuffle).toBe(false);
+    expect(usePlayer.getState().queue.map((t) => t.id)).toEqual(order);
+  });
+
   it("clear empties the queue", () => {
     reset();
     usePlayer.getState().playNow(tracks);

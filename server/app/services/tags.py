@@ -7,7 +7,21 @@ from pathlib import Path
 import mutagen
 from mutagen.flac import Picture
 
-SUPPORTED_EXTENSIONS = {".mp3", ".flac", ".m4a", ".mp4", ".ogg", ".oga", ".opus", ".wav", ".aac"}
+SUPPORTED_EXTENSIONS = {
+    ".mp3",
+    ".flac",
+    ".m4a",
+    ".mp4",
+    ".ogg",
+    ".oga",
+    ".opus",
+    ".wav",
+    ".aac",
+    ".wma",
+    ".aiff",
+    ".aif",
+    ".wv",
+}
 
 
 @dataclass
@@ -180,3 +194,134 @@ def read_track_meta(path: Path) -> TrackMeta:
         data, mime = _sidecar_artwork(path)
     meta.artwork_data, meta.artwork_mime = data, mime
     return meta
+
+
+def write_track_tags(path: Path, updates: dict[str, object]) -> None:
+    """Write approved tag fields back to the audio file (never silent).
+
+    Supports common ID3 / Vorbis / MP4 keys. Raises OSError / mutagen errors
+    to the caller — organization layer records them.
+    """
+    audio = mutagen.File(str(path), easy=False)
+    if audio is None:
+        raise OSError(f"Unsupported or unreadable file: {path}")
+
+    # Prefer EasyID3-style where available for MP3.
+    easy = None
+    try:
+        from mutagen.easyid3 import EasyID3
+        from mutagen.id3 import ID3NoHeaderError
+        from mutagen.mp3 import MP3
+
+        if isinstance(audio, MP3) or path.suffix.lower() == ".mp3":
+            try:
+                easy = EasyID3(str(path))
+            except ID3NoHeaderError:
+                easy = EasyID3()
+                easy.save(str(path))
+                easy = EasyID3(str(path))
+    except Exception:
+        easy = None
+
+    mapping_easy = {
+        "title": "title",
+        "artist": "artist",
+        "album": "album",
+        "album_artist": "albumartist",
+        "genre": "genre",
+        "year": "date",
+        "track_no": "tracknumber",
+    }
+
+    if easy is not None:
+        for field, easy_key in mapping_easy.items():
+            if field not in updates:
+                continue
+            value = updates[field]
+            if value is None or value == "":
+                if easy_key in easy:
+                    del easy[easy_key]
+            else:
+                easy[easy_key] = [str(value)]
+        easy.save(str(path))
+        return
+
+    # Generic / FLAC / MP4 fallback via mutagen File tags
+    if audio.tags is None:
+        try:
+            audio.add_tags()
+        except Exception as exc:
+            raise OSError(f"Cannot create tags for {path}: {exc}") from exc
+
+    tags = audio.tags
+    suffix = path.suffix.lower()
+
+    def _set_vorbis(key: str, value: object) -> None:
+        if value is None or value == "":
+            if key in tags:
+                del tags[key]
+        else:
+            tags[key] = [str(value)]
+
+    def _set_mp4(key: str, value: object) -> None:
+        if value is None or value == "":
+            if key in tags:
+                del tags[key]
+        else:
+            if key == "trkn":
+                tags[key] = [(int(value), 0)]
+            else:
+                tags[key] = [str(value)]
+
+    if suffix in {".flac", ".ogg", ".oga", ".opus"}:
+        key_map = {
+            "title": "TITLE",
+            "artist": "ARTIST",
+            "album": "ALBUM",
+            "album_artist": "ALBUMARTIST",
+            "genre": "GENRE",
+            "year": "DATE",
+            "track_no": "TRACKNUMBER",
+        }
+        for field, key in key_map.items():
+            if field in updates:
+                _set_vorbis(key, updates[field])
+    elif suffix in {".m4a", ".mp4", ".aac"}:
+        key_map = {
+            "title": "©nam",
+            "artist": "©ART",
+            "album": "©alb",
+            "album_artist": "aART",
+            "genre": "©gen",
+            "year": "©day",
+            "track_no": "trkn",
+        }
+        for field, key in key_map.items():
+            if field in updates:
+                _set_mp4(key, updates[field])
+    else:
+        # Best-effort ID3-like frames on other formats
+        from mutagen.id3 import TALB, TCON, TDRC, TIT2, TPE1, TPE2, TRCK
+
+        id3_map = {
+            "title": (TIT2, "TIT2"),
+            "artist": (TPE1, "TPE1"),
+            "album": (TALB, "TALB"),
+            "album_artist": (TPE2, "TPE2"),
+            "genre": (TCON, "TCON"),
+            "year": (TDRC, "TDRC"),
+            "track_no": (TRCK, "TRCK"),
+        }
+        for field, (frame_cls, key) in id3_map.items():
+            if field not in updates:
+                continue
+            value = updates[field]
+            try:
+                if value is None or value == "":
+                    tags.delall(key)
+                else:
+                    tags.setall(key, [frame_cls(encoding=3, text=str(value))])
+            except Exception:
+                pass
+
+    audio.save()

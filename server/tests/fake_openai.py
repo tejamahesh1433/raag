@@ -136,4 +136,18 @@ class FakeProvider:
 
             return StreamingResponse(gen(), media_type="text/event-stream")
 
+        @app.post("/v1/embeddings")
+        async def embeddings(request: Request):
+            body = await request.json()
+            fake.requests.append({"kind": "embeddings", **body})
+            raw = body.get("input", "")
+            texts = raw if isinstance(raw, list) else [raw]
+            data = []
+            for i, text in enumerate(texts):
+                # Deterministic tiny vectors from character codes — good enough for tests.
+                seed = sum(ord(c) for c in str(text)) or 1
+                vec = [((seed * (j + 1)) % 97) / 97.0 for j in range(8)]
+                data.append({"index": i, "embedding": vec})
+            return {"data": data}
+
         return app

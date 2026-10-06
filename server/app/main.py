@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config
 from .db import SessionLocal, init_db
-from .routers import auth, chat, library, playlists, system
+from .routers import auth, chat, discovery, library, organization, playlists, system
 
 # Built SPA (web/dist). When present, the server hosts the frontend itself —
 # one process is enough for LAN use; Caddy is only needed for public HTTPS.
@@ -20,7 +20,13 @@ WEB_DIST = Path(__file__).resolve().parent.parent.parent / "web" / "dist"
 async def lifespan(app: FastAPI):
     init_db()
     _bootstrap_admin()
-    yield
+    from .services.scheduler import start_scheduler, stop_scheduler
+
+    start_scheduler()
+    try:
+        yield
+    finally:
+        stop_scheduler()
 
 
 def _bootstrap_admin() -> None:
@@ -44,7 +50,7 @@ def _bootstrap_admin() -> None:
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Local Music Server",
+        title="Raag",
         version=config.VERSION,
         lifespan=lifespan,
         docs_url="/api/docs",
@@ -57,11 +63,25 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault(
+            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+        )
+        return response
+
     app.include_router(auth.router)
     app.include_router(library.router)
     app.include_router(playlists.router)
     app.include_router(system.router)
     app.include_router(chat.router)
+    app.include_router(discovery.router)
+    app.include_router(organization.router)
     _mount_spa(app)
     return app
 

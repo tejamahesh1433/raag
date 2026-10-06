@@ -1,23 +1,27 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { IconPlaylist, IconSpark } from "../components/icons";
-import { Card, PageHeader } from "../components/ui";
+import { IconClose, IconPlaylist, IconPlus, IconSpark } from "../components/icons";
+import { Card, PageHeader, SegmentedControl } from "../components/ui";
 import type { Playlist, Rule, RuleTree } from "../types";
 
 const RULE_FIELDS = ["genre", "artist", "album", "title", "year", "play_count"];
 const RULE_OPS = ["contains", "eq", "neq", "gt", "lt"];
 
+type RuleEntry = { field: string; op: string; value: string };
+const blankRule = (): RuleEntry => ({ field: "genre", op: "contains", value: "" });
+
 export function PlaylistsPage() {
+  const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
   const [smartOpen, setSmartOpen] = useState(false);
   const [smartName, setSmartName] = useState("");
-  const [ruleField, setRuleField] = useState("genre");
-  const [ruleOp, setRuleOp] = useState("contains");
-  const [ruleValue, setRuleValue] = useState("");
+  const [matchMode, setMatchMode] = useState<"all" | "any">("all");
+  const [rules, setRules] = useState<RuleEntry[]>([blankRule()]);
   const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const load = () => api.playlists().then(setPlaylists).catch(() => setPlaylists([]));
   useEffect(() => {
@@ -42,26 +46,42 @@ export function PlaylistsPage() {
 
   const createSmart = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!smartName.trim() || !ruleValue.trim()) return;
-    const rules: RuleTree = {
-      match: "all",
-      rules: [{ field: ruleField, op: ruleOp, value: ruleValue } as Rule],
+    if (!smartName.trim()) return;
+    const filled = rules.filter((r) => r.value.trim());
+    if (filled.length === 0) { setError("Add at least one rule with a value."); return; }
+    const ruleTree: RuleTree = {
+      match: matchMode,
+      rules: filled as Rule[],
     };
     setError("");
     try {
-      await api.createPlaylist({
-        name: smartName.trim(),
-        kind: "smart",
-        rules,
-      });
+      const pl = await api.createPlaylist({ name: smartName.trim(), kind: "smart", rules: ruleTree });
       setSmartName("");
-      setRuleValue("");
+      setRules([blankRule()]);
+      setMatchMode("all");
       setSmartOpen(false);
       await load();
+      navigate(`/playlists/${pl.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     }
   };
+
+  const importM3u = async (file: File) => {
+    setError("");
+    try {
+      const pl = await api.importM3u(file);
+      await load();
+      navigate(`/playlists/${pl.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+    }
+  };
+
+  const updateRule = (i: number, patch: Partial<RuleEntry>) =>
+    setRules((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const addRule = () => setRules((rs) => [...rs, blankRule()]);
+  const removeRule = (i: number) => setRules((rs) => rs.filter((_, idx) => idx !== i));
 
   return (
     <div>
@@ -78,6 +98,25 @@ export function PlaylistsPage() {
           <button className="btn btn-primary shrink-0" disabled={creating}>
             Create
           </button>
+          <button
+            type="button"
+            className="btn btn-ghost shrink-0"
+            title="Import M3U file"
+            onClick={() => fileRef.current?.click()}
+          >
+            Import M3U
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".m3u,.m3u8"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void importM3u(f);
+              e.target.value = "";
+            }}
+          />
         </form>
 
         <button
@@ -90,45 +129,80 @@ export function PlaylistsPage() {
         </button>
 
         {smartOpen && (
-          <Card className="space-y-2 !p-4">
-          <form onSubmit={createSmart} className="space-y-2">
-            <input
-              className="input"
-              placeholder="Smart playlist name…"
-              value={smartName}
-              onChange={(e) => setSmartName(e.target.value)}
-            />
-            <div className="flex flex-wrap gap-2">
-              <select
-                className="input !w-auto"
-                value={ruleField}
-                onChange={(e) => setRuleField(e.target.value)}
-              >
-                {RULE_FIELDS.map((f) => (
-                  <option key={f}>{f}</option>
-                ))}
-              </select>
-              <select
-                className="input !w-auto"
-                value={ruleOp}
-                onChange={(e) => setRuleOp(e.target.value)}
-              >
-                {RULE_OPS.map((o) => (
-                  <option key={o}>{o}</option>
-                ))}
-              </select>
+          <Card className="space-y-3 !p-4">
+            <form onSubmit={createSmart} className="space-y-3">
               <input
-                className="input min-w-32 flex-1"
-                placeholder="Value…"
-                value={ruleValue}
-                onChange={(e) => setRuleValue(e.target.value)}
+                className="input"
+                placeholder="Smart playlist name…"
+                value={smartName}
+                onChange={(e) => setSmartName(e.target.value)}
               />
-              <button className="btn btn-primary shrink-0">Create smart</button>
-            </div>
-            <div className="text-xs text-muted">
-              Example: genre <em>contains</em> rock — rules re-evaluate on every open.
-            </div>
-          </form>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted">Match</span>
+                <SegmentedControl
+                  value={matchMode}
+                  onChange={setMatchMode}
+                  options={[
+                    { id: "all", label: "All rules" },
+                    { id: "any", label: "Any rule" },
+                  ]}
+                />
+              </div>
+
+              <div className="space-y-2">
+                {rules.map((rule, i) => (
+                  <div key={i} className="flex flex-wrap items-center gap-2">
+                    <select
+                      className="input !w-auto"
+                      value={rule.field}
+                      onChange={(e) => updateRule(i, { field: e.target.value })}
+                    >
+                      {RULE_FIELDS.map((f) => <option key={f}>{f}</option>)}
+                    </select>
+                    <select
+                      className="input !w-auto"
+                      value={rule.op}
+                      onChange={(e) => updateRule(i, { op: e.target.value })}
+                    >
+                      {RULE_OPS.map((o) => <option key={o}>{o}</option>)}
+                    </select>
+                    <input
+                      className="input min-w-24 flex-1"
+                      placeholder="Value…"
+                      value={rule.value}
+                      onChange={(e) => updateRule(i, { value: e.target.value })}
+                    />
+                    {rules.length > 1 && (
+                      <button
+                        type="button"
+                        className="btn-icon !h-8 !w-8 text-muted hover:text-rose-400"
+                        onClick={() => removeRule(i)}
+                        title="Remove rule"
+                      >
+                        <IconClose size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  className="btn btn-ghost text-xs"
+                  onClick={addRule}
+                >
+                  <IconPlus size={14} />
+                  Add rule
+                </button>
+                <button className="btn btn-primary">Create smart</button>
+              </div>
+
+              <div className="text-xs text-muted">
+                Rules re-evaluate on every open · e.g. genre <em>contains</em> rock
+              </div>
+            </form>
           </Card>
         )}
 

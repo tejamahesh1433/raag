@@ -5,7 +5,8 @@ from conftest import ADMIN
 def test_setup_required_initially(client):
     resp = client.get("/api/auth/setup-required")
     assert resp.status_code == 200
-    assert resp.json() == {"required": True}
+    assert resp.json()["required"] is True
+    assert resp.json()["auth_required"] is True
 
 
 def test_setup_creates_admin_and_session(client):
@@ -19,7 +20,8 @@ def test_setup_creates_admin_and_session(client):
     assert me.status_code == 200
     assert me.json()["username"] == "admin"
 
-    assert client.get("/api/auth/setup-required").json() == {"required": False}
+    status = client.get("/api/auth/setup-required").json()
+    assert status["required"] is False
 
 
 def test_setup_forbidden_after_first_user(client):
@@ -72,3 +74,19 @@ def test_session_revoke(client):
     assert client.delete(f"/api/auth/sessions/{token}").status_code == 200
     # Revoked server-side -> cookie no longer valid
     assert client.get("/api/auth/me").status_code == 401
+
+
+def test_open_access_guest_no_login(client, monkeypatch):
+    """Product default: library works without creating an account."""
+    monkeypatch.setattr("app.config.AUTH_REQUIRED", False)
+    status = client.get("/api/auth/setup-required").json()
+    assert status["required"] is False
+    assert status["auth_required"] is False
+
+    me = client.get("/api/auth/me")
+    assert me.status_code == 200
+    assert me.json()["username"] == "guest"
+    assert me.json()["is_admin"] is True
+
+    assert client.get("/api/library/tracks").status_code == 200
+    assert client.get("/api/playlists").status_code == 200

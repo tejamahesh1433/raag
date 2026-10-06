@@ -62,27 +62,23 @@ interface Page<T> {
 
 export const api = {
   // auth
-  setupRequired: () => request<{ required: boolean }>("/api/auth/setup-required"),
-  setup: (username: string, password: string) =>
-    request<User>("/api/auth/setup", {
-      method: "POST",
-      body: JSON.stringify({ username, password }),
-    }),
-  login: (username: string, password: string) =>
-    request<User>("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ username, password }),
-    }),
-  logout: () => request<{ message: string }>("/api/auth/logout", { method: "POST" }),
   me: () => request<User>("/api/auth/me"),
 
   // library
-  tracks: (params: { offset?: number; limit?: number; order?: string } = {}) => {
+  tracks: (params: {
+    offset?: number;
+    limit?: number;
+    order?: string;
+    genre?: string;
+    folder?: string;
+  } = {}) => {
     const qs = new URLSearchParams({
       offset: String(params.offset ?? 0),
       limit: String(params.limit ?? 200),
       order: params.order ?? "title",
     });
+    if (params.genre) qs.set("genre", params.genre);
+    if (params.folder) qs.set("folder", params.folder);
     return request<Page<Track>>(`/api/library/tracks?${qs}`);
   },
   artists: () => request<Artist[]>("/api/library/artists"),
@@ -94,6 +90,7 @@ export const api = {
     request<Track[]>(`/api/library/albums/${albumId}/tracks`),
   artist: (artistId: number) => request<Artist>(`/api/library/artists/${artistId}`),
   genres: () => request<{ genre: string; count: number }[]>("/api/library/genres"),
+  folders: () => request<{ folder: string; count: number }[]>("/api/library/folders"),
   search: (q: string) => request<SearchResults>(`/api/library/search?q=${encodeURIComponent(q)}`),
   track: (id: number) => request<Track>(`/api/tracks/${id}`),
 
@@ -140,6 +137,12 @@ export const api = {
       body: JSON.stringify({ track_ids: trackIds }),
     }),
 
+  importM3u: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<Playlist>("/api/playlists/import", { method: "POST", body: form });
+  },
+
   // system
   scan: () => request<{ job_id: number; status: string }>("/api/library/scan", { method: "POST" }),
   job: (id: number) => request<Job>(`/api/jobs/${id}`),
@@ -151,12 +154,112 @@ export const api = {
       last_scan: Job | null;
       ai: { provider: string; base_url: string; reachable: boolean; models: string[] };
       library_roots: string[];
+      scan_interval_hours?: number;
+      transcode_enabled?: boolean;
+      ffmpeg_available?: boolean;
     }>("/api/health/detail"),
   settings: () => request<Settings>("/api/settings"),
   saveSettings: (payload: Partial<Settings>) =>
     request<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(payload) }),
   backup: () =>
     request<{ message: string }>("/api/settings/backup", { method: "POST" }),
+  restore: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<{ message: string }>("/api/settings/restore", { method: "POST", body: form });
+  },
+
+  // discovery (M4)
+  discoveryStatus: () =>
+    request<{ indexed: number; total: number; model: string; ready: boolean }>(
+      "/api/discovery/status",
+    ),
+  startEmbed: () =>
+    request<{ job_id: number; status: string }>("/api/discovery/embed", { method: "POST" }),
+  similarTracks: (trackId: number, limit = 12) =>
+    request<Array<{ track: Track; score: number }>>(
+      `/api/discovery/similar/${trackId}?limit=${limit}`,
+    ),
+  semanticSearch: (q: string, limit = 20) =>
+    request<Array<{ track: Track; score: number }>>(
+      `/api/discovery/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+    ),
+  lyrics: (trackId: number) =>
+    request<{ plain: string; synced: Array<{ t: number; text: string }>; source: string }>(
+      `/api/tracks/${trackId}/lyrics`,
+    ),
+  fetchLyrics: (trackId: number) =>
+    request<{ plain: string; synced: Array<{ t: number; text: string }>; source: string }>(
+      `/api/tracks/${trackId}/lyrics`,
+      { method: "POST" },
+    ),
+
+  // organization (M4/M5)
+  setupStatus: () =>
+    request<{
+      has_library_roots: boolean;
+      library_roots: string[];
+      track_count: number;
+      ai_reachable: boolean;
+      embeddings_ready: boolean;
+      pending_tag_suggestions: number;
+      online_enrichment: boolean;
+      is_admin: boolean;
+      wizard_complete: boolean;
+    }>("/api/organization/setup-status"),
+  tagSuggestions: (status = "pending") =>
+    request<
+      Array<{
+        id: number;
+        track_id: number;
+        status: string;
+        proposed: Record<string, unknown>;
+        original: Record<string, unknown>;
+        rationale: string;
+        created_at: string;
+        track: Track | null;
+      }>
+    >(`/api/organization/suggestions?status=${status}`),
+  scanTags: (useLlm = false) =>
+    request<{ job_id: number; status: string }>("/api/organization/scan-tags", {
+      method: "POST",
+      body: JSON.stringify({ use_llm: useLlm }),
+    }),
+  approveSuggestion: (id: number) =>
+    request<{ id: number; status: string }>(`/api/organization/suggestions/${id}/approve`, {
+      method: "POST",
+    }),
+  rejectSuggestion: (id: number) =>
+    request<{ id: number; status: string }>(`/api/organization/suggestions/${id}/reject`, {
+      method: "POST",
+    }),
+  duplicates: () =>
+    request<{
+      groups: Array<{
+        fingerprint: string;
+        count: number;
+        tracks: Array<{
+          id: number;
+          title: string;
+          artist: string;
+          album: string;
+          path: string;
+          duration: number;
+        }>;
+      }>;
+    }>("/api/organization/duplicates"),
+  startEnrich: () =>
+    request<{ job_id: number; status: string }>("/api/organization/enrich", { method: "POST" }),
+  artistEnrichment: (artistId: number) =>
+    request<Record<string, unknown>>(`/api/organization/enrichment/artist/${artistId}`),
+  albumEnrichment: (albumId: number) =>
+    request<Record<string, unknown>>(`/api/organization/enrichment/album/${albumId}`),
+  sessions: () =>
+    request<Array<{ token: string; created_at: string; expires_at: string }>>("/api/auth/sessions"),
+  revokeSession: (token: string) =>
+    request<{ message: string }>(`/api/auth/sessions/${encodeURIComponent(token)}`, {
+      method: "DELETE",
+    }),
 
   // AI chat
   chatHistory: () => request<ChatMessageOut[]>("/api/chat/history"),

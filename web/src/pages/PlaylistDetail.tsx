@@ -34,17 +34,12 @@ export function PlaylistDetailPage() {
 
   const manual = playlist.kind === "manual";
 
-  const move = async (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-    if (target < 0 || target >= tracks.length) return;
+  const reorder = async (from: number, to: number) => {
     const reordered = [...tracks];
-    const [row] = reordered.splice(index, 1);
-    reordered.splice(target, 0, row);
+    const [row] = reordered.splice(from, 1);
+    reordered.splice(to, 0, row);
     setTracks(reordered);
-    await api.reorderPlaylist(
-      playlist.id,
-      reordered.map((t) => t.id),
-    );
+    await api.reorderPlaylist(playlist.id, reordered.map((t) => t.id));
   };
 
   const remove = async (trackId: number) => {
@@ -100,36 +95,13 @@ export function PlaylistDetailPage() {
         </p>
       )}
 
-      <div className="relative">
-        <TrackList
-          tracks={tracks}
-          showAlbum={false}
-          onRemove={manual ? remove : undefined}
-          onRemoved={() => load()}
-        />
-        {manual && (
-          <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-10 flex-col items-center gap-1 pt-2 sm:flex">
-            {tracks.map((t, i) => (
-              <div key={t.id} className="pointer-events-auto flex flex-col">
-                <button
-                  className="h-5 w-8 rounded bg-panel-2 text-[10px] text-muted hover:text-ink"
-                  onClick={() => void move(i, -1)}
-                  title="Move up"
-                >
-                  ↑
-                </button>
-                <button
-                  className="h-5 w-8 rounded bg-panel-2 text-[10px] text-muted hover:text-ink"
-                  onClick={() => void move(i, 1)}
-                  title="Move down"
-                >
-                  ↓
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <TrackList
+        tracks={tracks}
+        showAlbum={false}
+        onRemove={manual ? remove : undefined}
+        onRemoved={() => load()}
+        onReorder={manual ? (from, to) => void reorder(from, to) : undefined}
+      />
 
       <div className="px-4 py-4 text-xs text-muted">
         <Link to="/playlists" className="underline">

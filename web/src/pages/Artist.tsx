@@ -15,6 +15,7 @@ export function ArtistPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
+  const [enrich, setEnrich] = useState<Record<string, unknown> | null>(null);
 
   const artworkByAlbumId = useMemo(
     () => Object.fromEntries(albums.map((a) => [a.id, a.artwork_id])),
@@ -50,6 +51,17 @@ export function ArtistPage() {
           <p className="mt-2 text-sm text-muted">
             {artist.album_count} albums · {artist.track_count} tracks
           </p>
+          {enrich && (
+            <p className="mt-2 max-w-xl text-xs leading-relaxed text-muted">
+              {enrich.disambiguation ? `${enrich.disambiguation} · ` : ""}
+              {enrich.type ? `${enrich.type}` : ""}
+              {enrich.country ? ` · ${enrich.country}` : ""}
+              {Array.isArray(enrich.tags) && enrich.tags.length
+                ? ` · ${(enrich.tags as string[]).slice(0, 5).join(", ")}`
+                : ""}
+              <span className="text-muted/60"> · MusicBrainz</span>
+            </p>
+          )}
           <div className="mt-5 flex flex-wrap gap-2">
             <button
               type="button"
@@ -66,6 +78,18 @@ export function ArtistPage() {
             >
               <IconPlus size={16} />
               Queue
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                void api
+                  .artistEnrichment(artistId)
+                  .then(setEnrich)
+                  .catch(() => setEnrich(null));
+              }}
+            >
+              Fetch info
             </button>
           </div>
         </div>

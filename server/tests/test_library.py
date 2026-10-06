@@ -126,3 +126,21 @@ def test_browse_artists_and_albums(auth_client, tmp_path):
     genres = auth_client.get("/api/library/genres").json()
     assert {g["genre"] for g in genres} == {"Ambient", "Rock", "Synthwave"}
 
+
+def test_browse_folders(auth_client, tmp_path):
+    build_library(tmp_path)
+    configure_and_scan(auth_client, tmp_path)
+
+    folders = auth_client.get("/api/library/folders").json()
+    assert folders
+    assert all("folder" in f and "count" in f for f in folders)
+    total = sum(f["count"] for f in folders)
+    assert total == 5
+
+    first = folders[0]["folder"]
+    page = auth_client.get(
+        f"/api/library/tracks?folder={first}&limit=100"
+    ).json()
+    assert page["total"] == folders[0]["count"]
+    assert len(page["items"]) == folders[0]["count"]
+

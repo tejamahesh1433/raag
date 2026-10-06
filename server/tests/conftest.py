@@ -18,6 +18,9 @@ os.environ["MUSIC_DB_PATH"] = str(_TMP / "test.db")
 os.environ["MUSIC_COOKIE_SECURE"] = "0"
 os.environ["MUSIC_LOGIN_MAX_ATTEMPTS"] = "5"
 os.environ["MUSIC_LOGIN_WINDOW_SECONDS"] = "300"
+# Tests cover the gated-auth path; product default is open access (AUTH_REQUIRED=0).
+os.environ["MUSIC_AUTH_REQUIRED"] = "1"
+os.environ["MUSIC_ALLOW_TAG_WRITES"] = "0"
 os.environ.pop("MUSIC_ADMIN_USER", None)
 os.environ.pop("MUSIC_ADMIN_PASSWORD", None)
 

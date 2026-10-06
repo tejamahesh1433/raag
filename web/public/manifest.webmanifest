@@ -1,16 +1,22 @@
 {
-  "name": "Local Music",
-  "short_name": "Music",
-  "description": "Your local music library with a private, local AI.",
+  "name": "Raag",
+  "short_name": "Raag",
+  "description": "Your local music library — private streaming with optional local AI.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#d7dee8",
-  "theme_color": "#b8ff2e",
+  "background_color": "#1a1622",
+  "theme_color": "#1a1622",
   "icons": [
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
       "purpose": "any"
     }
   ]

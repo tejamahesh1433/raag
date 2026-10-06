@@ -2,7 +2,6 @@
 import base64
 import json
 import re
-import threading
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -12,8 +11,8 @@ from sqlalchemy.orm import Session as DbSession
 from ..deps import get_current_user, get_db
 from ..models import Album, Artist, Favorite, Job, PlayEvent, Setting, Track, User, utcnow
 from ..schemas import AlbumOut, ArtistOut, MessageOut, PageOut, SearchOut, TrackOut
-from ..services.scanner import run_scan
-from ..services.streaming import stream_file
+from ..services.scan_jobs import queue_library_scan
+from ..services.streaming import stream_track_file
 
 router = APIRouter(prefix="/api", tags=["library"])
 
@@ -83,33 +82,42 @@ def start_scan(
     db: DbSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    setting = db.query(Setting).filter(Setting.key == "library_roots").first()
-    roots = json.loads(setting.value) if setting and setting.value else []
-    if not roots:
-        raise HTTPException(status_code=400, detail="No library roots configured")
-
-    job = Job(kind="scan", status="running", message="Starting scan")
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-
-    def _run():
-        from ..db import SessionLocal
-
-        with SessionLocal() as bg:
-            target = bg.query(Job).filter(Job.id == job.id).first()
-            try:
-                run_scan(bg, roots, target)
-            except Exception as exc:  # pragma: no cover - defensive
-                target.status = "error"
-                target.message = f"Scan failed: {exc}"
-                bg.commit()
-
-    threading.Thread(target=_run, daemon=True).start()
+    job = queue_library_scan(db)
+    if job is None:
+        # Distinguish no-roots vs already-running
+        setting = db.query(Setting).filter(Setting.key == "library_roots").first()
+        roots = json.loads(setting.value) if setting and setting.value else []
+        if not roots:
+            raise HTTPException(status_code=400, detail="No library roots configured")
+        raise HTTPException(status_code=409, detail="A library scan is already running")
     return {"job_id": job.id, "status": job.status}
 
 
 # Browse ---------------------------------------------------------------------
+def _library_roots(db: DbSession) -> list[str]:
+    setting = db.query(Setting).filter(Setting.key == "library_roots").first()
+    if not setting or not setting.value:
+        return []
+    try:
+        roots = json.loads(setting.value)
+    except json.JSONDecodeError:
+        return []
+    return [str(r) for r in roots] if isinstance(roots, list) else []
+
+
+def _folder_rel(path: str, roots: list[str]) -> str:
+    """Folder path relative to a library root (forward slashes)."""
+    resolved = Path(path).resolve()
+    for root in roots:
+        try:
+            rel = resolved.relative_to(Path(root).resolve())
+            parent = rel.parent
+            return "." if str(parent) in ("", ".") else parent.as_posix()
+        except ValueError:
+            continue
+    return Path(path).parent.as_posix()
+
+
 @router.get("/library/tracks", response_model=PageOut)
 def list_tracks(
     offset: int = Query(0, ge=0),
@@ -118,6 +126,7 @@ def list_tracks(
     album_id: int | None = None,
     artist_id: int | None = None,
     genre: str | None = None,
+    folder: str | None = None,
     db: DbSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -128,6 +137,15 @@ def list_tracks(
         query = query.filter(Track.artist_id == artist_id)
     if genre:
         query = query.filter(Track.genre == genre)
+    if folder is not None:
+        roots = _library_roots(db)
+        folder_norm = folder.strip().replace("\\", "/")
+        ids = [
+            tid
+            for tid, path in query.with_entities(Track.id, Track.path).all()
+            if _folder_rel(path, roots) == folder_norm
+        ]
+        query = db.query(Track).filter(Track.id.in_(ids if ids else [-1]))
     total = query.count()
     order_by = {
         "title": (Track.title.asc(),),
@@ -141,6 +159,22 @@ def list_tracks(
     return PageOut(
         items=[track_out(t, favs) for t in rows], total=total, offset=offset, limit=limit
     )
+
+
+@router.get("/library/folders", response_model=list[dict])
+def list_folders(
+    db: DbSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    roots = _library_roots(db)
+    counts: dict[str, int] = {}
+    for (path,) in db.query(Track.path).all():
+        key = _folder_rel(path, roots)
+        counts[key] = counts.get(key, 0) + 1
+    return [
+        {"folder": folder, "count": count}
+        for folder, count in sorted(counts.items(), key=lambda x: x[0].lower())
+    ]
 
 
 @router.get("/library/artists", response_model=list[ArtistOut])
@@ -316,7 +350,18 @@ def stream_track(
     # Defense: only serve paths that live under a configured library root.
     if not _is_under_roots(track.path):
         raise HTTPException(status_code=403, detail="Track path outside configured roots")
-    return stream_file(Path(track.path), request.headers.get("range"))
+    transcode_row = db.query(Setting).filter(Setting.key == "transcode_enabled").first()
+    transcode = False
+    if transcode_row and transcode_row.value:
+        try:
+            transcode = bool(json.loads(transcode_row.value))
+        except json.JSONDecodeError:
+            transcode = False
+    return stream_track_file(
+        Path(track.path),
+        request.headers.get("range"),
+        transcode=transcode,
+    )
 
 
 def _is_under_roots(path: str) -> bool:

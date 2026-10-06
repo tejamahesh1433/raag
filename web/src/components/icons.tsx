@@ -149,6 +149,15 @@ export function IconClose({ className, size = 20 }: IconProps) {
   );
 }
 
+export function IconChevronDown({ className, size = 20 }: IconProps) {
+  const p = base(className, size);
+  return (
+    <svg viewBox="0 0 24 24" {...p}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
 export function IconMusic({ className, size = 20 }: IconProps) {
   const p = base(className, size);
   return (

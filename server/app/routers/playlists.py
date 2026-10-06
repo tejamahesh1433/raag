@@ -1,7 +1,8 @@
-"""Playlists: manual CRUD, track management, smart rules, M3U export."""
+"""Playlists: manual CRUD, track management, smart rules, M3U export/import."""
 import json
+from pathlib import Path as FSPath
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
@@ -93,6 +94,88 @@ def create_playlist(
         owner_id=user.id,
     )
     db.add(playlist)
+    db.commit()
+    db.refresh(playlist)
+    return _playlist_out(db, playlist)
+
+
+@router.post("/import", response_model=PlaylistOut, status_code=201)
+async def import_m3u(
+    file: UploadFile = File(...),
+    db: DbSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Create a manual playlist from an uploaded .m3u / .m3u8 file.
+
+    Tracks are matched first by exact path, then by filename, then by EXTINF title+artist.
+    Unmatched entries are silently skipped.
+    """
+    raw = await file.read()
+    text = raw.decode("utf-8", errors="replace")
+
+    pl_name = FSPath(file.filename or "import").stem or "Imported"
+    extinf_artist: str | None = None
+    extinf_title: str | None = None
+    track_ids: list[int] = []
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("#EXTINF:"):
+            rest = line.split(":", 1)[1]
+            meta = rest.split(",", 1)[1] if "," in rest else ""
+            if " - " in meta:
+                extinf_artist, extinf_title = meta.split(" - ", 1)
+            else:
+                extinf_title = meta.strip() or None
+                extinf_artist = None
+            continue
+        if line.startswith("#"):
+            continue
+
+        # Try exact path
+        track = db.query(Track).filter(Track.path == line).first()
+
+        if track is None:
+            # Filename match (handles path-separator differences)
+            basename = FSPath(line).name
+            if basename:
+                candidates = (
+                    db.query(Track).filter(Track.path.like(f"%{basename}")).limit(2).all()
+                )
+                if len(candidates) == 1:
+                    track = candidates[0]
+
+        if track is None and extinf_artist and extinf_title:
+            # Title + artist fallback
+            track = (
+                db.query(Track)
+                .filter(
+                    func.lower(Track.title) == extinf_title.strip().lower(),
+                    func.lower(Track.artist_name) == extinf_artist.strip().lower(),
+                )
+                .first()
+            )
+
+        if track is not None and track.id not in track_ids:
+            track_ids.append(track.id)
+
+        extinf_artist = extinf_title = None
+
+    playlist = Playlist(
+        name=pl_name,
+        description=f"Imported from {file.filename}",
+        kind="manual",
+        rules="",
+        owner_id=user.id,
+    )
+    db.add(playlist)
+    db.commit()
+    db.refresh(playlist)
+
+    for pos, tid in enumerate(track_ids):
+        db.add(PlaylistTrack(playlist_id=playlist.id, track_id=tid, position=pos))
     db.commit()
     db.refresh(playlist)
     return _playlist_out(db, playlist)

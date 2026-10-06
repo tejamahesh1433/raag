@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -168,3 +169,56 @@ class ChatMessage(Base):
     content = Column(Text, nullable=False, default="")
     actions = Column(Text, default="")  # JSON list of tool/action summaries
     created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+
+
+class TrackEmbedding(Base):
+    """Vector embedding of track metadata (M4 semantic search)."""
+
+    __tablename__ = "track_embeddings"
+
+    track_id = Column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"), primary_key=True)
+    model = Column(String(64), nullable=False)
+    dim = Column(Integer, nullable=False)
+    vector = Column(LargeBinary, nullable=False)  # packed float32
+    updated_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class TrackLyrics(Base):
+    """Cached lyrics: plain text + optional synced lines (JSON)."""
+
+    __tablename__ = "track_lyrics"
+
+    track_id = Column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"), primary_key=True)
+    plain = Column(Text, default="")
+    synced = Column(Text, default="")  # JSON [{"t": seconds, "text": "..."}]
+    source = Column(String(32), nullable=False, default="cache")  # sidecar | lrclib | cache
+    updated_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class TagSuggestion(Base):
+    """AI-proposed tag correction awaiting human approval (never auto-written)."""
+
+    __tablename__ = "tag_suggestions"
+
+    id = Column(Integer, primary_key=True)
+    track_id = Column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(16), nullable=False, default="pending")  # pending|approved|rejected
+    proposed = Column(Text, nullable=False, default="{}")  # JSON field -> new value
+    original = Column(Text, nullable=False, default="{}")  # JSON backup at proposal time
+    rationale = Column(Text, default="")
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    resolved_at = Column(DateTime)
+
+
+class EnrichmentCache(Base):
+    """Cached MusicBrainz (or other free) enrichment payloads."""
+
+    __tablename__ = "enrichment_cache"
+    __table_args__ = (UniqueConstraint("kind", "key", name="uq_enrichment_kind_key"),)
+
+    id = Column(Integer, primary_key=True)
+    kind = Column(String(32), nullable=False)  # artist | album | album_summary
+    key = Column(String(512), nullable=False)
+    source = Column(String(32), nullable=False, default="musicbrainz")
+    payload = Column(Text, nullable=False, default="{}")
+    updated_at = Column(DateTime, default=utcnow, nullable=False)

@@ -203,7 +203,7 @@ export function ChatPage() {
                 </div>
               )}
               {m.notices.map((n, j) => (
-                <div key={j} className="mb-1 text-xs font-medium text-accent-2">
+                <div key={j} className="mb-1 text-xs font-medium text-accent-bright">
                   {n}
                 </div>
               ))}

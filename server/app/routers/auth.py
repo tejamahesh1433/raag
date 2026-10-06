@@ -35,8 +35,10 @@ def _start_session(response: Response, db: DbSession, user: User) -> SessionOut:
 
 @router.get("/setup-required")
 def setup_required(db: DbSession = Depends(get_db)) -> dict:
-    """Lets the frontend show a first-run setup screen when no users exist."""
-    return {"required": db.query(User).count() == 0}
+    """Account setup is only relevant when login is enforced."""
+    if not config.AUTH_REQUIRED:
+        return {"required": False, "auth_required": False}
+    return {"required": db.query(User).count() == 0, "auth_required": True}
 
 
 @router.post("/setup", response_model=UserOut, status_code=201)

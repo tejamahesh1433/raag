@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Music UI demos (throwaway)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Outfit:wght@400;500;600;700&family=Sora:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* PROTOTYPE ONLY — open this file in a browser. Do not ship. */
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: Outfit, system-ui, sans-serif;
+      background: #111;
+      color: #fff;
+      overflow: hidden;
+    }
+    .banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 16px;
+      background: #1a1a1a; border-bottom: 1px solid #333;
+      font-size: 12px; color: #aaa;
+    }
+    .banner strong { color: #fff; }
+    .banner code { background: #333; padding: 2px 6px; border-radius: 4px; color: #9cf; }
+    .stage { position: absolute; inset: 48px 0 72px; overflow: auto; }
+    .variant { display: none; min-height: 100%; }
+    .variant.active { display: block; }
+    /* C must be grid when shown — #C alone must NOT override .variant { display:none } */
+    #C.variant.active { display: grid; }
+
+    .switcher {
+      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+      z-index: 100; display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 999px;
+      background: #fff; color: #111; box-shadow: 0 8px 32px rgba(0,0,0,.45);
+      font-size: 13px; font-weight: 600;
+    }
+    .switcher button {
+      border: 0; background: #111; color: #fff; width: 36px; height: 36px;
+      border-radius: 50%; cursor: pointer; font-size: 16px;
+    }
+    .switcher .label { min-width: 220px; text-align: center; }
+    .switcher .hint { display: block; font-size: 10px; font-weight: 500; color: #666; }
+
+    /* ——— shared fake covers ——— */
+    .cover {
+      background-size: cover; background-position: center;
+      flex-shrink: 0;
+    }
+    .c1 { background-image: linear-gradient(135deg,#1d3557,#e63946); }
+    .c2 { background-image: linear-gradient(160deg,#2a9d8f,#264653); }
+    .c3 { background-image: linear-gradient(145deg,#f4a261,#e76f51); }
+    .c4 { background-image: linear-gradient(120deg,#7b2cbf,#ff6d00); }
+    .c5 { background-image: linear-gradient(200deg,#0f172a,#38bdf8); }
+    .c6 { background-image: linear-gradient(30deg,#365314,#a3e635); }
+    .demo-cover {
+      background-image: url("media/demo-cover.jpg");
+      background-size: cover;
+      background-position: center;
+    }
+
+    /* ================= VARIANT A — Immersive listening room ================= */
+    #A {
+      font-family: Outfit, sans-serif;
+      background: #0c0a09;
+      color: #faf7f2;
+      position: relative;
+      min-height: 100%;
+      padding-bottom: 100px;
+    }
+    #A .glow {
+      position: absolute; inset: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(230,57,70,.35), transparent 55%),
+        radial-gradient(ellipse 50% 40% at 80% 60%, rgba(29,53,87,.4), transparent 50%);
+      filter: blur(2px);
+    }
+    #A .shell { position: relative; max-width: 1100px; margin: 0 auto; padding: 28px 20px 40px; }
+    #A .top {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 36px;
+    }
+    #A .brand {
+      font-family: Fraunces, Georgia, serif; font-size: 22px; font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    #A .top nav { display: flex; gap: 18px; font-size: 13px; color: #a8a29e; }
+    #A .top nav span.active { color: #fff; }
+    #A .hero {
+      display: grid; grid-template-columns: 280px 1fr; gap: 36px; align-items: end;
+      margin-bottom: 48px;
+    }
+    @media (max-width: 720px) {
+      #A .hero { grid-template-columns: 1fr; }
+      #A .hero .cover { width: 220px; height: 220px; }
+    }
+    #A .hero .cover {
+      width: 280px; height: 280px; border-radius: 8px;
+      box-shadow: 0 30px 60px rgba(0,0,0,.55);
+    }
+    #A .hero .meta .kind { font-size: 11px; text-transform: uppercase; letter-spacing: .16em; color: #a8a29e; margin-bottom: 8px; }
+    #A .hero h1 {
+      font-family: Fraunces, Georgia, serif; font-size: clamp(36px, 6vw, 56px);
+      line-height: .95; margin: 0 0 10px; letter-spacing: -0.03em;
+    }
+    #A .hero .by { color: #d6d3d1; margin-bottom: 20px; }
+    #A .hero .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    #A .pill {
+      border: 0; border-radius: 999px; padding: 12px 22px; font-weight: 600; cursor: pointer;
+      font-family: inherit; font-size: 14px;
+    }
+    #A .pill.play { background: #faf7f2; color: #0c0a09; }
+    #A .pill.ghost { background: transparent; color: #faf7f2; outline: 1px solid #44403c; }
+    #A .row-title { font-size: 18px; font-weight: 600; margin: 0 0 14px; }
+    #A .tracks { display: flex; flex-direction: column; gap: 2px; }
+    #A .tr {
+      display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center;
+      padding: 10px 12px; border-radius: 10px;
+    }
+    #A .tr:hover, #A .tr.on { background: rgba(255,255,255,.06); }
+    #A .tr .n { color: #78716c; font-size: 13px; text-align: center; }
+    #A .tr .t { font-size: 14px; }
+    #A .tr .t small { display: block; color: #78716c; font-size: 12px; margin-top: 2px; }
+    #A .tr .d { color: #78716c; font-size: 12px; font-variant-numeric: tabular-nums; }
+    #A .dock {
+      position: sticky; bottom: 0; margin-top: 40px;
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 16px; border-radius: 16px;
+      background: rgba(28,25,23,.85); backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    #A .dock .cover { width: 48px; height: 48px; border-radius: 6px; }
+    #A .dock .info { flex: 1; min-width: 0; }
+    #A .dock .info strong { display: block; font-size: 13px; }
+    #A .dock .info span { font-size: 12px; color: #a8a29e; }
+    #A .dock .ctrl { display: flex; gap: 8px; align-items: center; }
+    #A .dock .ctrl button {
+      width: 36px; height: 36px; border-radius: 50%; border: 0; cursor: pointer;
+      background: #faf7f2; color: #0c0a09; font-weight: 700;
+    }
+
+    /* ================= VARIANT B — Cover shelf (record shop) ================= */
+    #B {
+      font-family: Sora, sans-serif;
+      background: #14181c;
+      color: #e8edf2;
+      min-height: 100%;
+      padding: 24px 0 120px;
+    }
+    #B header {
+      padding: 8px 24px 28px;
+      display: flex; align-items: baseline; justify-content: space-between;
+    }
+    #B .logo {
+      font-family: Space Grotesk, sans-serif; font-size: 28px; font-weight: 700;
+      letter-spacing: -0.04em;
+    }
+    #B .logo em { color: #5eead4; font-style: normal; }
+    #B .search {
+      background: #1c2228; border: 1px solid #2a323a; border-radius: 12px;
+      padding: 10px 16px; color: #94a3b8; min-width: 220px; font-size: 13px;
+    }
+    #B .shelf { margin-bottom: 36px; }
+    #B .shelf h2 {
+      font-size: 15px; font-weight: 600; padding: 0 24px; margin: 0 0 14px;
+      display: flex; justify-content: space-between; color: #cbd5e1;
+    }
+    #B .shelf h2 span { color: #64748b; font-weight: 400; font-size: 12px; }
+    #B .rail {
+      display: flex; gap: 16px; overflow-x: auto; padding: 4px 24px 12px;
+      scroll-snap-type: x mandatory;
+    }
+    #B .rail::-webkit-scrollbar { height: 6px; }
+    #B .rail::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    #B .album {
+      width: 160px; scroll-snap-align: start; cursor: pointer;
+    }
+    #B .album .cover {
+      width: 160px; height: 160px; border-radius: 4px;
+      box-shadow: 0 12px 28px rgba(0,0,0,.4);
+      transition: transform .2s ease;
+    }
+    #B .album:hover .cover { transform: translateY(-6px); }
+    #B .album .name { margin-top: 10px; font-size: 13px; font-weight: 600; }
+    #B .album .artist { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+    #B .now {
+      position: fixed; left: 16px; right: 16px; bottom: 88px;
+      display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center;
+      padding: 10px 14px; border-radius: 14px;
+      background: linear-gradient(90deg, #0f766e, #134e4a);
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+    }
+    #B .now .cover { width: 56px; height: 56px; border-radius: 6px; }
+    #B .now .txt strong { display: block; font-size: 14px; }
+    #B .now .txt span { font-size: 12px; opacity: .8; }
+    #B .now .btns { display: flex; gap: 8px; }
+    #B .now .btns button {
+      border: 0; background: rgba(255,255,255,.15); color: #fff;
+      width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 14px;
+    }
+    #B .now .btns button.main { background: #fff; color: #134e4a; font-weight: 700; }
+    #B .tabs {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      display: flex; justify-content: space-around;
+      padding: 10px 8px 14px; background: #0f1215; border-top: 1px solid #1e262e;
+      font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #64748b;
+    }
+    #B .tabs .on { color: #5eead4; }
+
+    /* ================= VARIANT C — Player first (refined) ================= */
+    #C {
+      font-family: Outfit, system-ui, sans-serif;
+      min-height: 100%;
+      grid-template-columns: minmax(0, 1fr) 380px;
+      background: #12121a;
+      color: #f4f4f5;
+    }
+    @media (max-width: 900px) {
+      #C { grid-template-columns: 1fr; }
+      #C .queue { display: none; }
+      #C .stage-main { padding: 28px 20px 48px; }
+      #C .disc { width: min(72vw, 320px); height: min(72vw, 320px); }
+    }
+    #C .stage-main {
+      position: relative;
+      min-height: calc(100vh - 48px - 72px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 40px 56px;
+      overflow: hidden;
+    }
+    #C .bg-art {
+      position: absolute; inset: -60px;
+      background-image: url("media/demo-cover.jpg");
+      background-size: cover;
+      background-position: center;
+      filter: blur(64px) saturate(1.35) brightness(0.55);
+      transform: scale(1.2);
+      opacity: 1;
+      animation: c-drift 18s ease-in-out infinite alternate;
+    }
+    @keyframes c-drift {
+      from { transform: scale(1.18) translate(-1%, -1%); }
+      to { transform: scale(1.28) translate(2%, 1%); }
+    }
+    #C .veil {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 70% 55% at 50% 35%, rgba(99,102,241,.15) 0%, transparent 55%),
+        linear-gradient(180deg, rgba(18,18,26,.2) 0%, transparent 35%, #12121a 100%);
+    }
+    #C .chrome {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 28px;
+    }
+    #C .chrome .pill-nav {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 14px; border-radius: 999px;
+      background: rgba(255,255,255,.08); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,.1);
+      font-size: 12px; color: #e4e4e7; cursor: default;
+    }
+    #C .chrome .icons { display: flex; gap: 8px; }
+    #C .chrome .icon-btn {
+      width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06); color: #fff; cursor: pointer; font-size: 14px;
+      backdrop-filter: blur(10px);
+    }
+    #C .player-stack {
+      position: relative; z-index: 1;
+      width: min(100%, 420px);
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+    }
+    #C .disc-wrap {
+      position: relative;
+      margin-bottom: 36px;
+      filter: drop-shadow(0 28px 50px rgba(0,0,0,.55));
+    }
+    #C .disc {
+      width: 340px; height: 340px; border-radius: 22px;
+      background-color: #312e81;
+      background-image: url("media/demo-cover.jpg");
+      background-size: cover; background-position: center;
+      position: relative; z-index: 2;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.12),
+        inset 0 0 0 1px rgba(255,255,255,.06);
+      transition: transform .5s cubic-bezier(.2,.8,.2,1);
+    }
+    #C.is-playing .disc {
+      animation: c-breathe 4s ease-in-out infinite;
+    }
+    @keyframes c-breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.018); }
+    }
+    #C .disc-ring {
+      position: absolute; inset: -18px; border-radius: 32px; z-index: 1;
+      background: conic-gradient(from 180deg, transparent, rgba(255,255,255,.18), transparent 40%);
+      opacity: 0; transition: opacity .4s;
+    }
+    #C.is-playing .disc-ring { opacity: 1; animation: c-spin 8s linear infinite; }
+    @keyframes c-spin { to { transform: rotate(360deg); } }
+    #C .live {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+      color: #fecdd3; margin-bottom: 14px;
+    }
+    #C .live i {
+      width: 7px; height: 7px; border-radius: 50%; background: #fb7185;
+      box-shadow: 0 0 14px #fb7185;
+    }
+    #C.is-playing .live i { animation: c-pulse 1.2s ease-in-out infinite; }
+    @keyframes c-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .55; transform: scale(0.85); }
+    }
+    #C h1 {
+      font-size: clamp(28px, 4.5vw, 40px);
+      line-height: 1.05; margin: 0 0 8px;
+      letter-spacing: -0.035em; font-weight: 700;
+    }
+    #C .artist {
+      font-size: 15px; color: #a1a1aa; margin-bottom: 10px;
+    }
+    #C .artist b { color: #e4e4e7; font-weight: 500; }
+    #C .bars {
+      display: flex; align-items: flex-end; justify-content: center; gap: 3px;
+      height: 22px; margin-bottom: 22px; opacity: .35;
+    }
+    #C.is-playing .bars { opacity: 1; }
+    #C .bars span {
+      width: 3px; border-radius: 2px; background: #fff;
+      height: 30%;
+    }
+    #C.is-playing .bars span:nth-child(1) { animation: c-bar 0.9s ease-in-out infinite; }
+    #C.is-playing .bars span:nth-child(2) { animation: c-bar 0.75s ease-in-out .1s infinite; }
+    #C.is-playing .bars span:nth-child(3) { animation: c-bar 1.05s ease-in-out .05s infinite; }
+    #C.is-playing .bars span:nth-child(4) { animation: c-bar 0.8s ease-in-out .15s infinite; }
+    #C.is-playing .bars span:nth-child(5) { animation: c-bar 0.95s ease-in-out .2s infinite; }
+    @keyframes c-bar {
+      0%, 100% { height: 25%; }
+      50% { height: 100%; }
+    }
+    #C .scrub {
+      width: 100%;
+      margin-bottom: 6px;
+    }
+    #C .progress {
+      position: relative;
+      height: 6px;
+      background: rgba(255,255,255,.14);
+      border-radius: 999px;
+      cursor: pointer;
+      overflow: visible;
+    }
+    #C .progress > i {
+      display: block; height: 100%; width: 0%;
+      background: linear-gradient(90deg, #fda4af, #fff);
+      border-radius: 999px;
+      position: relative;
+    }
+    #C .progress > i::after {
+      content: "";
+      position: absolute; right: -6px; top: 50%;
+      width: 14px; height: 14px; margin-top: -7px;
+      border-radius: 50%; background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,.4);
+      opacity: 0; transition: opacity .15s;
+    }
+    #C .progress:hover > i::after,
+    #C.is-playing .progress > i::after { opacity: 1; }
+    #C .times {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: #71717a;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 26px;
+    }
+    #C .transport {
+      display: flex; align-items: center; justify-content: center; gap: 18px;
+      margin-bottom: 22px;
+    }
+    #C .transport button {
+      border: 0; background: transparent; color: #e4e4e7; cursor: pointer;
+      font-size: 18px; width: 44px; height: 44px; border-radius: 50%;
+      transition: background .15s, color .15s;
+    }
+    #C .transport button:hover { background: rgba(255,255,255,.08); }
+    #C .transport .play {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: #fff; color: #06060a;
+      font-size: 24px; font-weight: 700;
+      box-shadow: 0 12px 32px rgba(0,0,0,.35);
+      transition: transform .15s, box-shadow .15s;
+    }
+    #C .transport .play:hover {
+      transform: scale(1.04);
+      box-shadow: 0 16px 40px rgba(0,0,0,.45);
+    }
+    #C .extras {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; gap: 12px;
+    }
+    #C .extras button {
+      border: 0; background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.1);
+      color: #d4d4d8; border-radius: 999px;
+      padding: 8px 14px; font-size: 12px; cursor: pointer;
+      font-family: inherit;
+    }
+    #C .vol {
+      display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end;
+      font-size: 12px; color: #71717a;
+    }
+    #C .vol-bar {
+      width: 88px; height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,.15); overflow: hidden;
+    }
+    #C .vol-bar i { display: block; width: 65%; height: 100%; background: #fff; border-radius: 2px; }
+
+    #C .queue {
+      position: relative;
+      border-left: 1px solid rgba(255,255,255,.06);
+      background: rgba(10,10,14,.72);
+      backdrop-filter: blur(24px);
+      padding: 28px 20px 24px;
+      overflow: auto;
+      display: flex; flex-direction: column;
+    }
+    #C .queue-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    #C .queue h3 {
+      margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: #f4f4f5;
+    }
+    #C .queue-tabs {
+      display: flex; gap: 4px; padding: 3px;
+      background: rgba(255,255,255,.06); border-radius: 10px;
+      margin-bottom: 16px;
+    }
+    #C .queue-tabs span {
+      flex: 1; text-align: center; padding: 8px; border-radius: 8px;
+      font-size: 11px; font-weight: 600; color: #71717a; cursor: default;
+    }
+    #C .queue-tabs span.on {
+      background: rgba(255,255,255,.1); color: #fff;
+    }
+    #C .q {
+      display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center;
+      padding: 10px; border-radius: 14px; margin-bottom: 4px;
+      cursor: pointer; transition: background .15s;
+    }
+    #C .q:hover { background: rgba(255,255,255,.04); }
+    #C .q.on {
+      background: rgba(255,255,255,.08);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+    }
+    #C .q .cover { width: 48px; height: 48px; border-radius: 10px; }
+    #C .q .t { font-size: 13px; font-weight: 500; text-align: left; }
+    #C .q .t small { display: block; color: #71717a; font-size: 11px; margin-top: 3px; font-weight: 400; }
+    #C .q .len { font-size: 11px; color: #52525b; font-variant-numeric: tabular-nums; }
+    #C .q.on .len { color: #fda4af; }
+    #C .queue-foot {
+      margin-top: auto; padding-top: 16px;
+      font-size: 11px; color: #52525b; text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="banner">
+    <div>
+      <strong>Throwaway design demos</strong> — tap Play to hear a real track from your library
+      (<em>Mamidi Konala Meena</em> · Madhu Priya). Not connected to the app.
+    </div>
+    <div>Open: <code>docs/design-demos/music-ui-preview.html</code></div>
+  </div>
+
+  <audio id="demo-audio" src="media/demo-track.m4a" preload="metadata"></audio>
+
+  <div class="stage">
+    <!-- A -->
+    <section id="A" class="variant" data-name="A — Listening room">
+      <div class="glow"></div>
+      <div class="shell">
+        <div class="top">
+          <div class="brand">Raag</div>
+          <nav>
+            <span class="active">Home</span>
+            <span>Library</span>
+            <span>Search</span>
+            <span>Playlists</span>
+          </nav>
+        </div>
+        <div class="hero">
+          <div class="cover demo-cover"></div>
+          <div class="meta">
+            <div class="kind">Album · Demo track</div>
+            <h1>Mamidi Konala Meena</h1>
+            <div class="by">Madhu Priya · 2026 · 1 song</div>
+            <div class="actions">
+              <button type="button" class="pill play" data-demo-play>Play</button>
+              <button type="button" class="pill ghost">Shuffle</button>
+              <button type="button" class="pill ghost">♡ Save</button>
+            </div>
+          </div>
+        </div>
+        <h2 class="row-title">Tracks</h2>
+        <div class="tracks">
+          <div class="tr on" data-demo-play role="button" tabindex="0"><div class="n">♪</div><div class="t">Mamidi Konala Meena<small>Madhu Priya</small></div><div class="d" data-demo-dur>—:—</div></div>
+          <div class="tr"><div class="n">2</div><div class="t">Second Dawn<small>Aurora</small></div><div class="d">2:48</div></div>
+          <div class="tr"><div class="n">3</div><div class="t">Red Line<small>Basement</small></div><div class="d">4:01</div></div>
+          <div class="tr"><div class="n">4</div><div class="t">Blue Shift<small>Basement</small></div><div class="d">3:33</div></div>
+          <div class="tr"><div class="n">5</div><div class="t">Night Drive<small>Cassette</small></div><div class="d">5:10</div></div>
+        </div>
+        <div class="dock">
+          <div class="cover demo-cover"></div>
+          <div class="info"><strong>Mamidi Konala Meena</strong><span>Madhu Priya — Mamidi Konala Meena</span></div>
+          <div class="ctrl">
+            <button type="button" aria-label="Previous">‹</button>
+            <button type="button" data-demo-play aria-label="Play/Pause">▶</button>
+            <button type="button" aria-label="Next">›</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- B -->
+    <section id="B" class="variant" data-name="B — Cover shelves">
+      <header>
+        <div class="logo">Cad<em>ence</em></div>
+        <div class="search">Search your library…</div>
+      </header>
+      <div class="shelf">
+        <h2>Recently played <span>See all</span></h2>
+        <div class="rail">
+          <div class="album" data-demo-play role="button" tabindex="0"><div class="cover demo-cover"></div><div class="name">Mamidi Konala Meena</div><div class="artist">Madhu Priya</div></div>
+          <div class="album"><div class="cover c2"></div><div class="name">Concrete</div><div class="artist">Basement</div></div>
+          <div class="album"><div class="cover c3"></div><div class="name">Neon City</div><div class="artist">Cassette</div></div>
+          <div class="album"><div class="cover c4"></div><div class="name">Bangaara</div><div class="artist">Madhu Priya</div></div>
+          <div class="album"><div class="cover c5"></div><div class="name">Hara Om</div><div class="artist">Mangli</div></div>
+          <div class="album"><div class="cover c6"></div><div class="name">Night Drive</div><div class="artist">Cassette</div></div>
+        </div>
+      </div>
+      <div class="shelf">
+        <h2>Albums <span>123</span></h2>
+        <div class="rail">
+          <div class="album" data-demo-play role="button" tabindex="0"><div class="cover demo-cover"></div><div class="name">Mamidi Konala Meena</div><div class="artist">Madhu Priya</div></div>
+          <div class="album"><div class="cover c5"></div><div class="name">Hara Om</div><div class="artist">Mangli</div></div>
+          <div class="album"><div class="cover c6"></div><div class="name">Bayilone</div><div class="artist">Mangli</div></div>
+          <div class="album"><div class="cover c2"></div><div class="name">Concrete</div><div class="artist">Basement</div></div>
+          <div class="album"><div class="cover c1"></div><div class="name">Northern Skies</div><div class="artist">Aurora</div></div>
+          <div class="album"><div class="cover c3"></div><div class="name">Neon City</div><div class="artist">Cassette</div></div>
+        </div>
+      </div>
+      <div class="shelf">
+        <h2>Made for you <span>Playlists</span></h2>
+        <div class="rail">
+          <div class="album"><div class="cover c3"></div><div class="name">Favorites</div><div class="artist">12 tracks</div></div>
+          <div class="album"><div class="cover c5"></div><div class="name">Telugu hits</div><div class="artist">Smart · genre</div></div>
+          <div class="album"><div class="cover c2"></div><div class="name">Late night</div><div class="artist">Manual</div></div>
+        </div>
+      </div>
+      <div class="now">
+        <div class="cover demo-cover"></div>
+        <div class="txt"><strong>Mamidi Konala Meena</strong><span>Madhu Priya</span></div>
+        <div class="btns">
+          <button type="button">‹</button>
+          <button type="button" class="main" data-demo-play>▶</button>
+          <button type="button">›</button>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="on">Home</div><div>Search</div><div>Library</div><div>Playlists</div>
+      </div>
+    </section>
+
+    <!-- C -->
+    <section id="C" class="variant active" data-name="C — Player first (refined)">
+      <div class="stage-main">
+        <div class="bg-art" aria-hidden="true"></div>
+        <div class="veil" aria-hidden="true"></div>
+        <div class="chrome">
+          <div class="pill-nav">← Library</div>
+          <div class="icons">
+            <button type="button" class="icon-btn" title="Cast">⎓</button>
+            <button type="button" class="icon-btn" title="More">⋯</button>
+          </div>
+        </div>
+        <div class="player-stack">
+          <div class="disc-wrap">
+            <div class="disc-ring" aria-hidden="true"></div>
+            <div class="disc demo-cover" role="img" aria-label="Album cover"></div>
+          </div>
+          <div class="live"><i></i> Now playing</div>
+          <h1>Mamidi Konala Meena</h1>
+          <div class="artist"><b>Madhu Priya</b> · Mamidi Konala Meena</div>
+          <div class="bars" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="scrub">
+            <div class="progress" id="demo-progress" title="Seek"><i id="demo-progress-fill"></i></div>
+            <div class="times"><span id="demo-t0">0:00</span><span id="demo-t1">—:—</span></div>
+          </div>
+          <div class="transport">
+            <button type="button" title="Shuffle">⇄</button>
+            <button type="button" title="Previous">⏮</button>
+            <button type="button" class="play" data-demo-play title="Play">▶</button>
+            <button type="button" title="Next">⏭</button>
+            <button type="button" title="Repeat">⟳</button>
+          </div>
+          <div class="extras">
+            <button type="button">♡ Save</button>
+            <button type="button">＋ Queue</button>
+            <div class="vol"><span>🔊</span><div class="vol-bar"><i></i></div></div>
+          </div>
+        </div>
+      </div>
+      <aside class="queue">
+        <div class="queue-head">
+          <h3>Listening</h3>
+        </div>
+        <div class="queue-tabs">
+          <span class="on">Up next</span>
+          <span>History</span>
+        </div>
+        <div class="q on" data-demo-play role="button" tabindex="0">
+          <div class="cover demo-cover"></div>
+          <div class="t">Mamidi Konala Meena<small>Madhu Priya</small></div>
+          <div class="len" data-demo-dur>—:—</div>
+        </div>
+        <div class="q">
+          <div class="cover c4"></div>
+          <div class="t">Bangaara<small>Madhu Priya</small></div>
+          <div class="len">3:21</div>
+        </div>
+        <div class="q">
+          <div class="cover c5"></div>
+          <div class="t">Hara Om<small>Mangli</small></div>
+          <div class="len">4:02</div>
+        </div>
+        <div class="q">
+          <div class="cover c2"></div>
+          <div class="t">Red Line<small>Basement</small></div>
+          <div class="len">4:01</div>
+        </div>
+        <div class="q">
+          <div class="cover c3"></div>
+          <div class="t">Night Drive<small>Cassette</small></div>
+          <div class="len">5:10</div>
+        </div>
+        <div class="q">
+          <div class="cover c6"></div>
+          <div class="t">Bayilone Ballipalike<small>Mangli</small></div>
+          <div class="len">3:44</div>
+        </div>
+        <div class="queue-foot">Demo queue · not your real library</div>
+      </aside>
+    </section>
+  </div>
+
+  <div class="switcher" role="toolbar" aria-label="Variant switcher">
+    <button type="button" id="prev" aria-label="Previous">←</button>
+    <div class="label">
+      <span id="name">A — Listening room</span>
+      <span class="hint">← → keys · mockup only</span>
+    </div>
+    <button type="button" id="next" aria-label="Next">→</button>
+  </div>
+
+  <script>
+    const order = ['A', 'B', 'C'];
+    const params = new URLSearchParams(location.search);
+    let current = (params.get('variant') || 'C').toUpperCase();
+    if (!order.includes(current)) current = 'C';
+
+    function show(id) {
+      current = id;
+      document.querySelectorAll('.variant').forEach((el) => {
+        el.classList.toggle('active', el.id === id);
+      });
+      const el = document.getElementById(id);
+      document.getElementById('name').textContent = el.dataset.name;
+      const url = new URL(location.href);
+      url.searchParams.set('variant', id);
+      history.replaceState(null, '', url);
+    }
+
+    function step(dir) {
+      const i = order.indexOf(current);
+      show(order[(i + dir + order.length) % order.length]);
+    }
+
+    document.getElementById('prev').onclick = () => step(-1);
+    document.getElementById('next').onclick = () => step(1);
+    window.addEventListener('keydown', (e) => {
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+      if (e.key === 'ArrowLeft') step(-1);
+      if (e.key === 'ArrowRight') step(1);
+      if (e.key === ' ') {
+        e.preventDefault();
+        togglePlay();
+      }
+    });
+
+    show(current);
+
+    // Guard: audio UI hooks only if elements exist
+    const audio = document.getElementById('demo-audio');
+    const fill = document.getElementById('demo-progress-fill');
+    const t0 = document.getElementById('demo-t0');
+    const t1 = document.getElementById('demo-t1');
+    const progress = document.getElementById('demo-progress');
+    const variantC = document.getElementById('C');
+
+    function fmt(s) {
+      if (!Number.isFinite(s) || s < 0) return '0:00';
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return m + ':' + String(sec).padStart(2, '0');
+    }
+
+    function syncPlayButtons() {
+      const playing = !audio.paused;
+      if (variantC) variantC.classList.toggle('is-playing', playing);
+      document.querySelectorAll('[data-demo-play]').forEach((el) => {
+        if (el.classList.contains('pill') && el.classList.contains('play')) {
+          el.textContent = playing ? 'Pause' : 'Play';
+        } else if (el.tagName === 'BUTTON') {
+          el.textContent = playing ? '❚❚' : '▶';
+        }
+      });
+    }
+
+    function togglePlay() {
+      if (!audio) return;
+      if (audio.paused) {
+        audio.play().catch((err) => {
+          console.error(err);
+          alert('Could not play demo audio. Keep media/demo-track.m4a beside this HTML.\n' + err);
+        });
+      } else {
+        audio.pause();
+      }
+    }
+
+    document.querySelectorAll('[data-demo-play]').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        togglePlay();
+      });
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          togglePlay();
+        }
+      });
+    });
+
+    if (audio) {
+      audio.addEventListener('play', syncPlayButtons);
+      audio.addEventListener('pause', syncPlayButtons);
+      audio.addEventListener('loadedmetadata', () => {
+        if (t1) t1.textContent = fmt(audio.duration);
+        document.querySelectorAll('[data-demo-dur]').forEach((el) => {
+          el.textContent = fmt(audio.duration);
+        });
+      });
+      audio.addEventListener('timeupdate', () => {
+        if (t0) t0.textContent = fmt(audio.currentTime);
+        if (fill && audio.duration) {
+          fill.style.width = (audio.currentTime / audio.duration) * 100 + '%';
+        }
+      });
+    }
+    if (progress && audio) {
+      progress.addEventListener('click', (e) => {
+        if (!audio.duration) return;
+        const rect = progress.getBoundingClientRect();
+        const ratio = (e.clientX - rect.left) / rect.width;
+        audio.currentTime = Math.min(1, Math.max(0, ratio)) * audio.duration;
+      });
+    }
+  </script>
+</body>
+</html>

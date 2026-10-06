@@ -91,4 +91,6 @@ export interface Settings {
     tag_model?: string;
     online_enrichment?: boolean;
   };
+  scan_interval_hours?: number;
+  transcode_enabled?: boolean;
 }

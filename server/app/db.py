@@ -99,6 +99,8 @@ def _seed_settings() -> None:
                 "online_enrichment": True,
             },
         )
+        defaults.setdefault("scan_interval_hours", 0)
+        defaults.setdefault("transcode_enabled", False)
         for key, value in defaults.items():
             if key not in existing:
                 s.add(Setting(key=key, value=json.dumps(value)))

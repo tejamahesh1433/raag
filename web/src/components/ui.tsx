@@ -16,11 +16,9 @@ export function PageHeader({
       <div className="min-w-0 flex-1">
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="font-display text-4xl leading-[0.9] text-ink sm:text-5xl">
-            {title}
-          </h1>
+          <h1 className="text-display text-4xl sm:text-5xl">{title}</h1>
           {subtitle && (
-            <span className="font-mono text-xs uppercase tracking-wider text-muted">{subtitle}</span>
+            <span className="text-sm font-medium tracking-wide text-muted">{subtitle}</span>
           )}
         </div>
       </div>

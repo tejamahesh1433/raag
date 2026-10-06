@@ -134,11 +134,15 @@ class JobOut(BaseModel):
 class SettingsOut(BaseModel):
     library_roots: list[str]
     ai: dict
+    scan_interval_hours: int = 0
+    transcode_enabled: bool = False
 
 
 class SettingsUpdate(BaseModel):
     library_roots: list[str] | None = None
     ai: dict | None = None
+    scan_interval_hours: int | None = Field(default=None, ge=0, le=168)
+    transcode_enabled: bool | None = None
 
 
 class MessageOut(BaseModel):

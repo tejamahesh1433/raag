@@ -40,7 +40,12 @@ def resolve_model(ai_cfg: dict, task: str = "chat") -> str:
     model = str(ai_cfg.get(key) or "").strip()
     if model:
         return model
-    return config.AI_CHAT_MODEL
+    defaults = {
+        "chat": config.AI_CHAT_MODEL,
+        "embed": config.AI_EMBED_MODEL,
+        "tag": config.AI_TAG_MODEL or config.AI_CHAT_MODEL,
+    }
+    return defaults.get(task, config.AI_CHAT_MODEL)
 
 
 def _timeout() -> httpx.Timeout:
@@ -175,3 +180,45 @@ def extract_tool_calls(response: dict) -> list[dict]:
             }
         )
     return [c for c in normalized if c["name"]]
+
+
+def embed(ai_cfg: dict, texts: list[str]) -> list[list[float]]:
+    """Embed texts via the OpenAI-compatible /embeddings endpoint.
+
+    Tries a batched request first; some servers only support single inputs,
+    so on a mismatched reply length it falls back to one request per text.
+    Raises ProviderUnavailable on any failure.
+    """
+    if not texts:
+        return []
+    url = f"{resolve_base_url(ai_cfg)}/embeddings"
+    model = resolve_model(ai_cfg, "embed")
+
+    def _call(payload_input) -> list[list[float]]:
+        try:
+            with httpx.Client(
+                timeout=httpx.Timeout(
+                    connect=_CONNECT_TIMEOUT, read=120.0, write=30.0, pool=_CONNECT_TIMEOUT
+                )
+            ) as client:
+                resp = client.post(url, json={"model": model, "input": payload_input})
+        except httpx.HTTPError as exc:
+            raise ProviderUnavailable(f"Cannot reach embeddings endpoint: {exc}") from exc
+        if resp.status_code != 200:
+            raise ProviderUnavailable(
+                f"Embeddings endpoint HTTP {resp.status_code}: {resp.text[:200]}"
+            )
+        try:
+            data = sorted(resp.json()["data"], key=lambda d: d.get("index", 0))
+            return [list(map(float, row["embedding"])) for row in data]
+        except (ValueError, KeyError, TypeError) as exc:
+            raise ProviderUnavailable(f"Bad embeddings response: {exc}") from exc
+
+    if len(texts) == 1:
+        return _call(texts[0])
+
+    vectors = _call(texts)
+    if len(vectors) == len(texts):
+        return vectors
+    # Fallback: servers that ignore array input — one request per text.
+    return [_call(t)[0] for t in texts]

@@ -1,4 +1,4 @@
-# Local Music Server — one command: docker compose up -d
+# Raag — one command: docker compose up -d
 # Audio library is bind-mounted read-write (tag writes + scanning).
 services:
   music:
@@ -44,16 +44,17 @@ services:
   #   #           capabilities: [gpu]
 
   # Optional HTTPS reverse proxy for music.tejainfo.xyz — see docs/deploy.md
-  # caddy:
-  #   image: caddy:2
-  #   restart: unless-stopped
-  #   ports: ["80:80", "443:443"]
-  #   volumes:
-  #     - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-  #     - caddy-data:/data
-  #   depends_on: [music]
+  caddy:
+    profiles: ["caddy"]
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [music]
 
 volumes:
   music-data:
   # ollama-models:
-  # caddy-data:
+  caddy-data:
