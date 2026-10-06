@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from typing import Any
 
 import httpx
@@ -11,6 +13,11 @@ from ..models import Album, Artist, EnrichmentCache, Job, Setting, utcnow
 
 _UA = {"User-Agent": "Raag/0.3 (self-hosted music; contact: local)"}
 _MB = "https://musicbrainz.org/ws/2"
+
+# MusicBrainz allows max 1 request per second from a single IP.
+_MB_LOCK = threading.Lock()
+_MB_LAST = 0.0
+_MB_MIN_INTERVAL = 1.05  # slightly over 1 s to stay well under the limit
 
 
 def _ai_cfg(db: DbSession) -> dict:
@@ -59,7 +66,14 @@ def _put_cache(db: DbSession, kind: str, key: str, source: str, payload: dict) -
 
 
 def _mb_get(path: str, params: dict[str, Any]) -> dict | None:
+    global _MB_LAST
     params = {**params, "fmt": "json"}
+    with _MB_LOCK:
+        now = time.monotonic()
+        wait = _MB_MIN_INTERVAL - (now - _MB_LAST)
+        if wait > 0:
+            time.sleep(wait)
+        _MB_LAST = time.monotonic()
     try:
         with httpx.Client(timeout=12.0, headers=_UA) as client:
             resp = client.get(f"{_MB}/{path}", params=params)

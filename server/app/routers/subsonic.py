@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from .. import config
 from ..deps import get_db
-from ..models import Album, Artist, Artwork, Track
+from ..models import Album, Artist, Artwork, Favorite, PlayEvent, Playlist, PlaylistTrack, Track
 from ..services import streaming as stream_svc
 from .library import _favorite_ids
 
@@ -256,3 +256,111 @@ def search3(
         )
 
     return _format_subsonic_response(request, {"searchResult3": {"song": songs}})
+
+
+@router.get("/star")
+@router.get("/star.view")
+def star(
+    request: Request,
+    id: str = Query(...),
+    db: DbSession = Depends(get_db),
+):
+    try:
+        track_id = int(id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid id")
+    track = db.get(Track, track_id)
+    if not track:
+        return _format_subsonic_response(request, {"error": {"code": 70, "message": "Not found"}}, status="failed")
+    from ..models import User, utcnow
+    user = db.query(User).first()
+    if user:
+        exists = db.query(Favorite).filter(Favorite.user_id == user.id, Favorite.track_id == track_id).first()
+        if not exists:
+            db.add(Favorite(user_id=user.id, track_id=track_id))
+            db.commit()
+    return _format_subsonic_response(request, {})
+
+
+@router.get("/unstar")
+@router.get("/unstar.view")
+def unstar(
+    request: Request,
+    id: str = Query(...),
+    db: DbSession = Depends(get_db),
+):
+    try:
+        track_id = int(id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid id")
+    from ..models import User
+    user = db.query(User).first()
+    if user:
+        db.query(Favorite).filter(Favorite.user_id == user.id, Favorite.track_id == track_id).delete()
+        db.commit()
+    return _format_subsonic_response(request, {})
+
+
+@router.get("/scrobble")
+@router.get("/scrobble.view")
+def subsonic_scrobble(
+    request: Request,
+    id: str = Query(...),
+    db: DbSession = Depends(get_db),
+):
+    try:
+        track_id = int(id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid id")
+    track = db.get(Track, track_id)
+    if not track:
+        return _format_subsonic_response(request, {"error": {"code": 70, "message": "Not found"}}, status="failed")
+    from ..models import User, utcnow
+    import json
+    user = db.query(User).first()
+    if user:
+        db.add(PlayEvent(user_id=user.id, track_id=track_id, played_at=utcnow()))
+        track.play_count = (track.play_count or 0) + 1
+        db.commit()
+        try:
+            from ..models import Setting
+            from ..services.scrobble import scrobble_track
+            from ..services.discord_hook import notify_discord
+            cfg_row = db.query(Setting).filter(Setting.key == "scrobble").first()
+            cfg = json.loads(cfg_row.value) if cfg_row and cfg_row.value else {}
+            scrobble_track(track, cfg if isinstance(cfg, dict) else {})
+            discord_row = db.query(Setting).filter(Setting.key == "discord").first()
+            discord_cfg = json.loads(discord_row.value) if discord_row and discord_row.value else {}
+            notify_discord(track, discord_cfg if isinstance(discord_cfg, dict) else {})
+        except Exception:
+            pass
+    return _format_subsonic_response(request, {})
+
+
+@router.get("/createPlaylist")
+@router.get("/createPlaylist.view")
+def subsonic_create_playlist(
+    request: Request,
+    name: str = Query(""),
+    songId: list[str] = Query(default=[]),
+    db: DbSession = Depends(get_db),
+):
+    from ..models import User, utcnow
+    user = db.query(User).first()
+    if not user:
+        return _format_subsonic_response(request, {"error": {"code": 40, "message": "No user"}}, status="failed")
+    pl = Playlist(name=name or "Untitled", kind="manual", owner_id=user.id)
+    db.add(pl)
+    db.flush()
+    for pos, sid in enumerate(songId):
+        try:
+            track_id = int(sid)
+        except ValueError:
+            continue
+        db.add(PlaylistTrack(playlist_id=pl.id, track_id=track_id, position=pos))
+        pl.track_count = (pl.track_count or 0) + 1
+    db.commit()
+    return _format_subsonic_response(
+        request,
+        {"playlist": {"id": str(pl.id), "name": pl.name, "songCount": pl.track_count or 0}},
+    )
