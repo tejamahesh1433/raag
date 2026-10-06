@@ -16,10 +16,12 @@ export function PageHeader({
       <div className="min-w-0 flex-1">
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="font-display text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+          <h1 className="font-display text-4xl leading-[0.9] text-ink sm:text-5xl">
             {title}
           </h1>
-          {subtitle && <span className="text-sm text-muted">{subtitle}</span>}
+          {subtitle && (
+            <span className="font-mono text-xs uppercase tracking-wider text-muted">{subtitle}</span>
+          )}
         </div>
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}

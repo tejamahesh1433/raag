@@ -4,6 +4,7 @@ The two approved seams:
 1. HTTP API — everything is tested through FastAPI TestClient.
 2. AI provider — fake OpenAI-compatible server (tests/ai_stub.py), used from M3.
 """
+import json
 import os
 import tempfile
 import time
@@ -124,3 +125,50 @@ def configure_and_scan(client: TestClient, root: Path) -> dict:
     resp = client.post("/api/library/scan")
     assert resp.status_code == 202, resp.text
     return wait_for_job(client, resp.json()["job_id"])
+
+
+@pytest.fixture()
+def fake_provider():
+    """The AI seam: a programmable OpenAI-compatible server on a real port."""
+    from fake_openai import FakeProvider
+
+    fp = FakeProvider()
+    fp.start()
+    try:
+        yield fp
+    finally:
+        fp.stop()
+
+
+def point_ai_at(client: TestClient, base_url: str) -> None:
+    """Configure the app's AI settings to target a specific endpoint."""
+    resp = client.put(
+        "/api/settings",
+        json={
+            "ai": {
+                "provider": "custom",
+                "base_url": base_url,
+                "chat_model": "fake-model",
+                "embed_model": "fake-model",
+            }
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+
+def parse_sse(text: str) -> list[tuple[str, dict]]:
+    """Parse an SSE body into (event, data) tuples."""
+    events: list[tuple[str, dict]] = []
+    for block in text.split("\n\n"):
+        if not block.strip():
+            continue
+        name = None
+        data = None
+        for line in block.splitlines():
+            if line.startswith("event: "):
+                name = line[len("event: "):].strip()
+            elif line.startswith("data: "):
+                data = json.loads(line[len("data: "):])
+        if name is not None:
+            events.append((name, data))
+    return events

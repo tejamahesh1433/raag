@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { IconMusic } from "../components/icons";
 import { useAuth } from "../store/auth";
 
 export function LoginPage({ mustSetup }: { mustSetup: boolean }) {
@@ -27,21 +26,27 @@ export function LoginPage({ mustSetup }: { mustSetup: boolean }) {
     <div className="login-shell">
       <form
         onSubmit={submit}
-        className="relative z-10 w-full max-w-md rounded-3xl border border-border-subtle bg-panel/90 p-8 shadow-2xl backdrop-blur-xl"
+        className="relative z-10 w-full max-w-md border-2 border-ink bg-panel p-8 shadow-[8px_8px_0_0_var(--color-ink)]"
       >
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-surface-2 text-accent">
-            <IconMusic size={28} />
+        <div className="mb-8">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <span className="brand-mark">LM</span>
+            <span className="on-air">
+              <span className="on-air-dot" />
+              Studio
+            </span>
           </div>
-          <h1 className="font-display text-3xl text-ink">Local Music</h1>
-          <p className="mt-2 text-sm text-muted">
+          <h1 className="font-display text-4xl leading-none text-ink">Local Music</h1>
+          <p className="mt-3 font-mono text-xs uppercase tracking-wider text-muted">
             {mustSetup
-              ? "Create the owner account for this server"
-              : "Sign in to browse and play your library"}
+              ? "First transmission — create the owner account"
+              : "Sign in to open the booth"}
           </p>
         </div>
 
-        <label className="mb-1.5 block text-xs font-medium text-muted">Username</label>
+        <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-widest text-muted">
+          Callsign
+        </label>
         <input
           className="input mb-4"
           value={username}
@@ -50,7 +55,9 @@ export function LoginPage({ mustSetup }: { mustSetup: boolean }) {
           autoComplete="username"
           required
         />
-        <label className="mb-1.5 block text-xs font-medium text-muted">Password</label>
+        <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-widest text-muted">
+          Passkey
+        </label>
         <input
           className="input mb-5"
           type="password"
@@ -62,13 +69,13 @@ export function LoginPage({ mustSetup }: { mustSetup: boolean }) {
         />
 
         {error && (
-          <div className="mb-4 rounded-xl border border-rose-900/50 bg-rose-950/40 px-3 py-2 text-sm text-rose-300">
+          <div className="mb-4 border-2 border-signal bg-signal/10 px-3 py-2 font-mono text-sm text-signal">
             {error}
           </div>
         )}
 
         <button className="btn btn-primary w-full py-3" disabled={busy}>
-          {busy ? "Please wait…" : mustSetup ? "Create account" : "Sign in"}
+          {busy ? "Connecting…" : mustSetup ? "Go on air" : "Enter booth"}
         </button>
       </form>
     </div>

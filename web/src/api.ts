@@ -8,6 +8,15 @@ import type {
   Track,
   User,
 } from "./types";
+import { createSSEParser, type SSEEvent } from "./lib/sse";
+
+export interface ChatMessageOut {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  actions: Array<Record<string, unknown>>;
+  created_at: string;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -148,4 +157,50 @@ export const api = {
     request<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(payload) }),
   backup: () =>
     request<{ message: string }>("/api/settings/backup", { method: "POST" }),
+
+  // AI chat
+  chatHistory: () => request<ChatMessageOut[]>("/api/chat/history"),
+  clearChat: () =>
+    request<{ message: string }>("/api/chat/history", { method: "DELETE" }),
+  /** POST /api/chat and pump the SSE stream through `onEvent`. */
+  streamChat: async (
+    message: string,
+    nowPlaying: { title: string; artist: string } | null,
+    onEvent: (ev: SSEEvent) => void,
+  ): Promise<void> => {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, now_playing: nowPlaying }),
+    });
+    if (res.status === 401) {
+      window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+      throw new ApiError(401, "Not authenticated");
+    }
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      } catch {
+        /* keep statusText */
+      }
+      throw new ApiError(res.status, detail);
+    }
+    if (!res.body) throw new ApiError(500, "Streaming not supported");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    const parser = createSSEParser(onEvent);
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parser.push(decoder.decode(value, { stream: true }));
+      }
+      parser.flush();
+    } finally {
+      reader.releaseLock();
+    }
+  },
 };

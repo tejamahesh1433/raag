@@ -9,7 +9,7 @@ your machines.**
 
 ---
 
-## What works today (M0 + M1)
+## What works today (M0 + M1 + M3)
 
 - ✅ **Library scanning** — point at folders, get incremental rescans with progress
 - ✅ **Browse** by tracks / albums / artists / genres + instant full-text search (SQLite FTS5)
@@ -22,9 +22,12 @@ your machines.**
 - ✅ **Settings UI** — library folders, scan button, AI provider config, DB backup
 - ✅ **Responsive PWA shell** — installable on iOS/Android/iPad
 - ✅ **Single process** — the Python server also serves the built frontend
+- ✅ **AI Assistant (M3)** — SSE-streaming chat that *acts* on your library via tool
+  calls: search tracks, play/queue, create playlists — all through your local
+  Ollama or LM Studio, with persisted per-user history and graceful "AI offline" mode
 
-**Roadmap:** M2 remote access polish → M3 AI chat with tool calls → M4 embeddings,
-AI playlists, lyrics/enrichment, auto-tagging → M5 hardening. See the spec.
+**Roadmap:** M2 remote access polish → M4 embeddings, AI playlists, lyrics/enrichment,
+auto-tagging → M5 hardening. See the spec.
 
 ---
 
@@ -124,14 +127,16 @@ rate-limited, media is served only from configured library roots by database id
 ## Tests
 
 ```bash
-# Backend — 26 integration tests through the HTTP API seam
+# Backend — 37 integration tests through the HTTP API seam
+# (incl. 9 chat tests against the fake OpenAI provider = the AI seam)
 cd server && .venv/bin/pytest -q
 
-# Frontend — player queue/shuffle/repeat state machine
+# Frontend — player queue + SSE parser state machines
 cd web && npm test
 
-# Live smoke test (server must be running on :8765)
-cd server && .venv/bin/python tests/smoke_live.py
+# Live smoke tests (server must be running on :8765)
+cd server && .venv/bin/python tests/smoke_live.py         # library/player API
+cd server && .venv/bin/python tests/smoke_chat_live.py    # real Ollama chat + tools
 ```
 
 ## Project layout

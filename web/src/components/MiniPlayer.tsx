@@ -126,7 +126,7 @@ export function MiniPlayer() {
   return (
     <div className={`player-dock ${bottomClass}`}>
       <div
-        className="group/progress h-1 w-full cursor-pointer bg-border-subtle"
+        className="group/progress h-2 w-full cursor-pointer bg-ink"
         onClick={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           const ratio = (e.clientX - rect.left) / rect.width;
@@ -136,27 +136,37 @@ export function MiniPlayer() {
         <div
           className="relative h-full bg-accent transition-[width] duration-150"
           style={{ width: duration ? `${(progress / duration) * 100}%` : "0%" }}
-        >
-          <div className="absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 translate-x-1/2 rounded-full bg-accent-bright opacity-0 shadow-lg transition-opacity group-hover/progress:opacity-100" />
-        </div>
+        />
       </div>
 
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-5 sm:px-6">
-        <Artwork artworkId={artworkId} size={52} className="!rounded-lg shadow-md" />
+        <Artwork
+          artworkId={artworkId}
+          size={52}
+          className="!rounded-none border-2 !border-accent"
+        />
 
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-ink">{current.title}</div>
-          <div className="truncate text-xs text-muted">
+          <div className="mb-0.5 flex items-center gap-2">
+            {playing && (
+              <span className="on-air !px-1.5 !py-0 !text-[9px]">
+                <span className="on-air-dot" />
+                Live
+              </span>
+            )}
+            <div className="truncate text-sm font-semibold text-panel">{current.title}</div>
+          </div>
+          <div className="truncate font-mono text-[11px] uppercase tracking-wide text-panel/60">
             {current.artist}
-            <span className="text-muted/60"> · </span>
+            <span className="text-panel/35"> · </span>
             {current.album}
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5 sm:gap-1">
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            className={`btn-icon hidden sm:flex ${shuffle ? "btn-icon-active" : ""}`}
+            className={`btn-icon !text-panel hover:!bg-accent hover:!text-ink ${shuffle ? "!border-accent !bg-accent !text-ink" : ""} hidden sm:flex`}
             onClick={() => usePlayer.getState().toggleShuffle()}
             title="Shuffle"
           >
@@ -164,7 +174,7 @@ export function MiniPlayer() {
           </button>
           <button
             type="button"
-            className="btn-icon"
+            className="btn-icon !text-panel hover:!bg-accent hover:!text-ink"
             onClick={() => usePlayer.getState().prev()}
             title="Previous"
           >
@@ -172,7 +182,7 @@ export function MiniPlayer() {
           </button>
           <button
             type="button"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-surface shadow-lg transition-transform hover:scale-105 hover:bg-accent-bright"
+            className="flex h-11 w-11 items-center justify-center border-2 border-accent bg-accent text-ink shadow-[3px_3px_0_0_var(--color-signal)] transition-transform hover:-translate-y-px"
             onClick={() => usePlayer.getState().toggle()}
             title={playing ? "Pause" : "Play"}
           >
@@ -180,7 +190,7 @@ export function MiniPlayer() {
           </button>
           <button
             type="button"
-            className="btn-icon"
+            className="btn-icon !text-panel hover:!bg-accent hover:!text-ink"
             onClick={() => usePlayer.getState().next()}
             title="Next"
           >
@@ -188,7 +198,7 @@ export function MiniPlayer() {
           </button>
           <button
             type="button"
-            className={`btn-icon hidden sm:flex ${repeat !== "off" ? "btn-icon-active" : ""}`}
+            className={`btn-icon !text-panel hover:!bg-accent hover:!text-ink ${repeat !== "off" ? "!border-accent !bg-accent !text-ink" : ""} hidden sm:flex`}
             onClick={() => usePlayer.getState().cycleRepeat()}
             title={`Repeat: ${repeat}`}
           >
@@ -196,7 +206,7 @@ export function MiniPlayer() {
           </button>
         </div>
 
-        <div className="hidden w-24 text-right text-xs tabular-nums text-muted md:block">
+        <div className="hidden w-28 text-right font-mono text-xs tabular-nums text-accent md:block">
           {fmt(progress)} / {fmt(duration)}
         </div>
       </div>

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { AlbumPage } from "./pages/Album";
 import { ArtistPage } from "./pages/Artist";
+import { ChatPage } from "./pages/Chat";
 import { FavoritesPage } from "./pages/Favorites";
 import { LibraryPage } from "./pages/Library";
 import { LoginPage } from "./pages/Login";
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/albums/:id" element={<AlbumPage />} />
         <Route path="/artists/:id" element={<ArtistPage />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/chat" element={<ChatPage />} />
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/playlists" element={<PlaylistsPage />} />
         <Route path="/playlists/:id" element={<PlaylistDetailPage />} />

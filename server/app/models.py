@@ -155,3 +155,16 @@ class Setting(Base):
 
     key = Column(String(64), primary_key=True)
     value = Column(Text, nullable=False, default="")
+
+
+class ChatMessage(Base):
+    """Persisted AI assistant conversation (per user, local only)."""
+
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(16), nullable=False)  # user | assistant
+    content = Column(Text, nullable=False, default="")
+    actions = Column(Text, default="")  # JSON list of tool/action summaries
+    created_at = Column(DateTime, default=utcnow, nullable=False, index=True)

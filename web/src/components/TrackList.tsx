@@ -81,16 +81,16 @@ export function TrackList({
             >
               <button
                 type="button"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs tabular-nums text-muted transition-colors hover:bg-panel-2 hover:text-accent"
+                className="flex h-9 w-9 shrink-0 items-center justify-center font-mono text-xs tabular-nums text-muted transition-colors hover:border-2 hover:border-ink hover:bg-accent hover:text-ink"
                 onClick={() => usePlayer.getState().playNow(tracks, i)}
                 title="Play"
               >
                 {isCurrent && playing ? (
-                  <IconMusic size={16} className="text-accent" />
+                  <IconMusic size={16} className="text-ink" />
                 ) : (
                   <>
-                    <span className="group-hover/track:hidden">{i + 1}</span>
-                    <span className="hidden text-accent group-hover/track:inline">
+                    <span className="group-hover/track:hidden">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="hidden text-ink group-hover/track:inline">
                       <IconPlay size={14} className="ml-0.5" />
                     </span>
                   </>
@@ -105,11 +105,11 @@ export function TrackList({
 
               <div className="min-w-0 flex-1">
                 <div
-                  className={`truncate text-sm font-medium ${isCurrent ? "text-accent-bright" : "text-ink"}`}
+                  className={`truncate text-sm font-semibold ${isCurrent ? "text-ink underline decoration-2" : "text-ink"}`}
                 >
                   {track.title}
                 </div>
-                <div className="truncate text-xs text-muted">
+                <div className="truncate font-mono text-[11px] uppercase tracking-wide text-muted">
                   {track.artist}
                   {showAlbum ? ` · ${track.album}` : ""}
                 </div>
@@ -127,7 +127,7 @@ export function TrackList({
                   type="button"
                   className={`btn-icon !h-9 !w-9 ${
                     track.is_favorite
-                      ? "text-accent"
+                      ? "!border-ink !bg-signal !text-panel"
                       : "opacity-0 [.track-row:hover_&]:opacity-100 sm:opacity-100"
                   }`}
                   onClick={() => void toggleFavorite(track)}
@@ -166,15 +166,15 @@ export function TrackList({
                     <IconMore size={18} />
                   </button>
                   {menuFor === track.id && (
-                    <div className="absolute right-0 top-10 z-40 w-52 rounded-xl border border-border bg-panel-2 p-1.5 shadow-2xl">
+                    <div className="absolute right-0 top-10 z-40 w-52 border-2 border-ink bg-panel-2 p-1.5 shadow-[4px_4px_0_0_var(--color-ink)]">
                       {playlists === null && (
-                        <div className="px-2 py-2 text-xs text-muted">Loading…</div>
+                        <div className="px-2 py-2 font-mono text-xs text-muted">Loading…</div>
                       )}
                       {playlists?.map((pl) => (
                         <button
                           key={pl.id}
                           type="button"
-                          className="flex w-full items-center gap-2 truncate rounded-lg px-2 py-2 text-left text-xs hover:bg-panel"
+                          className="flex w-full items-center gap-2 truncate px-2 py-2 text-left text-xs hover:bg-accent"
                           onClick={async () => {
                             await api.addToPlaylist(pl.id, [track.id]);
                             setMenuFor(null);
@@ -182,13 +182,13 @@ export function TrackList({
                           }}
                         >
                           {pl.kind !== "manual" && (
-                            <IconSpark size={14} className="shrink-0 text-accent" />
+                            <IconSpark size={14} className="shrink-0 text-signal" />
                           )}
                           {pl.name}
                         </button>
                       ))}
                       {playlists?.length === 0 && (
-                        <div className="px-2 py-2 text-xs text-muted">No playlists yet</div>
+                        <div className="px-2 py-2 font-mono text-xs text-muted">No playlists yet</div>
                       )}
                     </div>
                   )}
