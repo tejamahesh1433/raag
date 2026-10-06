@@ -1,8 +1,8 @@
 # Raag — Product Requirements Document (Spec)
 
 **Status:** `in-progress` · **Created:** 2026-10-05 · **Updated:** 2026-10-06 · **Scope:** Local-first music server + free local AI (Ollama / LM Studio)
-**Brand:** Raag · **Access:** open by default (`MUSIC_AUTH_REQUIRED=0`); audio files never rewritten
-**Shipped:** M0–M5 core — scan/stream/player, playlists (manual + multi-rule smart, M3U export/import, drag-reorder), chat, embeddings, semantic search, similar tracks, plain+synced lyrics UI, genres/years/folders/recent browse, Organize (duplicates + enrichment only), wizard (incl. remote-access checklist), Media Session, open access, sleep timer, volume normalize, scheduled rescan, optional ffmpeg transcoding, queue remove/reorder, playback persistence, DB restore, album enrichment display, global keyboard shortcuts (Space/←/→/L/M)
+**Brand:** Raag · **Access:** single-user open-access by default (`MUSIC_AUTH_REQUIRED=0`, no auth required); audio files never rewritten
+**Shipped:** M0–M5 core + power features — scan/stream/player, Subsonic/OpenSubsonic API compatibility (`/rest/*`), Web Audio 5-band Graphic Equalizer + presets, Crossfade, Song Radio queue generation, Library listening analytics & stats, playlists (manual + multi-rule smart, M3U export/import, drag-reorder), chat, embeddings, semantic search, similar tracks, plain+synced lyrics UI, genres/years/folders/recent browse, Organize (duplicates + enrichment only), wizard (incl. remote-access checklist), Media Session, sleep timer, volume normalize, scheduled rescan, optional ffmpeg transcoding, queue remove/reorder, playback persistence, DB restore, album enrichment display, global keyboard shortcuts (Space/←/→/L/M)
 **Out of scope (product decision):** AI DJ / For You shelf, forced login, tag file writes
 **Next:** optional UX polish — DNS/Cloudflare Tunnel wizard, MusicBrainz rate-limit pacing
 

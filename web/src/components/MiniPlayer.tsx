@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { getAudio, isNormalizeOn, pauseAudio, setNormalize, stopAudio } from "../audioEngine";
+import { getAudio, isNormalizeOn, pauseAudio, setNormalize, stopAudio, ensureAnalyser } from "../audioEngine";
+import { SpectrumVisualizer } from "./SpectrumVisualizer";
+import { getStreamQuality, setStreamQuality, type StreamQuality } from "../lib/streamQuality";
+import { downloadTrack, isOffline, removeOfflineTrack } from "../lib/offline";
 import { usePlayer } from "../store/player";
 import type { Track } from "../types";
 import { Artwork } from "./Artwork";
@@ -47,8 +50,11 @@ export function MiniPlayer() {
   const sleepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sleepTick = useRef<ReturnType<typeof setInterval> | null>(null);
   const [normalize, setNormalizeState] = useState(isNormalizeOn());
+  const [streamQuality, setStreamQualityState] = useState<StreamQuality>(getStreamQuality());
+  const [offlineSaved, setOfflineSaved] = useState(false);
   const queueDragIdx = useRef(-1);
   const [queueDragOver, setQueueDragOver] = useState(-1);
+  const scrobbledRef = useRef<number | null>(null);
 
   const queue = usePlayer((s) => s.queue);
   const index = usePlayer((s) => s.index);
@@ -126,11 +132,36 @@ export function MiniPlayer() {
 
   const reportedRef = useRef<number | null>(null);
   useEffect(() => {
-    if (current && reportedRef.current !== current.id) {
-      reportedRef.current = current.id;
-      void api.recordPlayed(current.id).catch(() => undefined);
+    scrobbledRef.current = null;
+    reportedRef.current = null;
+    if (!current) {
+      setOfflineSaved(false);
+      return;
     }
-  }, [current]);
+    void isOffline(current.id).then(setOfflineSaved).catch(() => setOfflineSaved(false));
+  }, [current?.id]);
+
+  // Scrobble / play-count at Last.fm rule: 50% or 4 minutes.
+  useEffect(() => {
+    if (!current || !playing) return;
+    const audio = getAudio();
+    const maybeScrobble = () => {
+      if (scrobbledRef.current === current.id) return;
+      const t = audio.currentTime;
+      const d = audio.duration || current.duration || 0;
+      if (t >= 240 || (d > 0 && t >= d * 0.5)) {
+        scrobbledRef.current = current.id;
+        reportedRef.current = current.id;
+        void api.recordPlayed(current.id).catch(() => undefined);
+      }
+    };
+    audio.addEventListener("timeupdate", maybeScrobble);
+    return () => audio.removeEventListener("timeupdate", maybeScrobble);
+  }, [current, playing]);
+
+  useEffect(() => {
+    if (playing) ensureAnalyser();
+  }, [playing]);
 
   useEffect(() => {
     setFavorite(Boolean(current?.is_favorite));
@@ -466,6 +497,55 @@ export function MiniPlayer() {
 
               <div className={`now-playing-bars ${playing ? "is-playing" : ""}`} aria-hidden>
                 <span /><span /><span /><span /><span />
+              </div>
+              <SpectrumVisualizer active={expanded && playing} />
+
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <label className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] text-muted backdrop-blur-md">
+                  Quality
+                  <select
+                    className="bg-transparent text-ink outline-none"
+                    value={streamQuality}
+                    onChange={(e) => {
+                      const q = e.target.value as StreamQuality;
+                      setStreamQuality(q);
+                      setStreamQualityState(q);
+                      // Reload current track at new quality
+                      const a = getAudio();
+                      const t = a.currentTime;
+                      a.src = api.streamUrl(current.id, q);
+                      a.currentTime = t;
+                      if (playing) void a.play().catch(() => undefined);
+                    }}
+                  >
+                    <option value="original">Original</option>
+                    <option value="320">320 kbps</option>
+                    <option value="256">256 kbps</option>
+                    <option value="192">192 kbps</option>
+                    <option value="128">128 kbps</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] text-ink backdrop-blur-md hover:bg-white/12"
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        if (offlineSaved) {
+                          await removeOfflineTrack(current.id);
+                          setOfflineSaved(false);
+                        } else {
+                          await downloadTrack(current);
+                          setOfflineSaved(true);
+                        }
+                      } catch {
+                        /* ignore */
+                      }
+                    })();
+                  }}
+                >
+                  {offlineSaved ? "Remove offline" : "Save offline"}
+                </button>
               </div>
 
               <div className="mt-6 w-full">

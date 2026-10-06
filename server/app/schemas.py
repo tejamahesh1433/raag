@@ -136,6 +136,7 @@ class SettingsOut(BaseModel):
     ai: dict
     scan_interval_hours: int = 0
     transcode_enabled: bool = False
+    scrobble: dict = {}
 
 
 class SettingsUpdate(BaseModel):
@@ -143,6 +144,14 @@ class SettingsUpdate(BaseModel):
     ai: dict | None = None
     scan_interval_hours: int | None = Field(default=None, ge=0, le=168)
     transcode_enabled: bool | None = None
+    scrobble: dict | None = None
+
+
+class LastfmAuthIn(BaseModel):
+    username: str
+    password: str
+    api_key: str
+    api_secret: str
 
 
 class MessageOut(BaseModel):

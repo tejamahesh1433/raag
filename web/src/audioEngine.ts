@@ -6,6 +6,7 @@ let audio: HTMLAudioElement | null = null;
 let _ctx: AudioContext | null = null;
 let _src: MediaElementAudioSourceNode | null = null;
 let _comp: DynamicsCompressorNode | null = null;
+let _analyser: AnalyserNode | null = null;
 let _eqBands: BiquadFilterNode[] = [];
 let _normalizeOn = false;
 let _crossfadeDuration = 0; // seconds
@@ -80,9 +81,13 @@ function _initAudioGraph(): void {
       return filter;
     });
 
+    _analyser = _ctx.createAnalyser();
+    _analyser.fftSize = 256;
+    _analyser.smoothingTimeConstant = 0.8;
+
     _reconnectGraph();
   } catch {
-    _ctx = _src = _comp = null;
+    _ctx = _src = _comp = _analyser = null;
     _eqBands = [];
   }
 }
@@ -92,6 +97,7 @@ function _reconnectGraph(): void {
   try {
     _src.disconnect();
     _comp?.disconnect();
+    _analyser?.disconnect();
     _eqBands.forEach((b) => b.disconnect());
 
     let lastNode: AudioNode = _src;
@@ -104,7 +110,12 @@ function _reconnectGraph(): void {
 
     if (_normalizeOn && _comp) {
       lastNode.connect(_comp);
-      _comp.connect(_ctx.destination);
+      lastNode = _comp;
+    }
+
+    if (_analyser) {
+      lastNode.connect(_analyser);
+      _analyser.connect(_ctx.destination);
     } else {
       lastNode.connect(_ctx.destination);
     }
@@ -163,4 +174,14 @@ export function setCrossfade(seconds: number): void {
 
 export function getCrossfade(): number {
   return _crossfadeDuration;
+}
+
+/** Ensure Web Audio graph (and analyser) exists — call after user gesture. */
+export function ensureAnalyser(): AnalyserNode | null {
+  _initAudioGraph();
+  return _analyser;
+}
+
+export function getAnalyser(): AnalyserNode | null {
+  return _analyser;
 }

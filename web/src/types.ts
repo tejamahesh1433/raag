@@ -93,4 +93,12 @@ export interface Settings {
   };
   scan_interval_hours?: number;
   transcode_enabled?: boolean;
+  scrobble?: {
+    lastfm_enabled?: boolean;
+    lastfm_api_key?: string;
+    lastfm_api_secret?: string;
+    lastfm_session_key?: string;
+    listenbrainz_enabled?: boolean;
+    listenbrainz_token?: string;
+  };
 }

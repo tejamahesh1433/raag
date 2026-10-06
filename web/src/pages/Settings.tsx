@@ -3,6 +3,14 @@ import { api } from "../api";
 import { Card, PageHeader } from "../components/ui";
 import type { Job, Settings } from "../types";
 import { useAuth } from "../store/auth";
+import {
+  getCrossfade,
+  getEqPreset,
+  setCrossfade,
+  setEqPreset,
+  type EqPreset,
+} from "../audioEngine";
+import { getStreamQuality, setStreamQuality, type StreamQuality } from "../lib/streamQuality";
 
 export function SettingsPage() {
   const { user } = useAuth();
@@ -15,6 +23,17 @@ export function SettingsPage() {
   const [onlineEnrichment, setOnlineEnrichment] = useState(true);
   const [scanInterval, setScanInterval] = useState(0);
   const [transcodeEnabled, setTranscodeEnabled] = useState(false);
+  const [eqPreset, setEqPresetState] = useState<EqPreset>(getEqPreset());
+  const [crossfadeSec, setCrossfadeSec] = useState<number>(getCrossfade());
+  const [streamQuality, setStreamQualityState] = useState<StreamQuality>(getStreamQuality());
+  const [lfmEnabled, setLfmEnabled] = useState(false);
+  const [lfmKey, setLfmKey] = useState("");
+  const [lfmSecret, setLfmSecret] = useState("");
+  const [lfmSession, setLfmSession] = useState("");
+  const [lfmUser, setLfmUser] = useState("");
+  const [lfmPass, setLfmPass] = useState("");
+  const [lbEnabled, setLbEnabled] = useState(false);
+  const [lbToken, setLbToken] = useState("");
   const [scanJob, setScanJob] = useState<Job | null>(null);
   const [embedJob, setEmbedJob] = useState<Job | null>(null);
   const [embedStatus, setEmbedStatus] = useState<{
@@ -26,6 +45,7 @@ export function SettingsPage() {
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof api.healthDetail>> | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
 
   const load = async () => {
     try {
@@ -39,6 +59,13 @@ export function SettingsPage() {
       setOnlineEnrichment(s.ai.online_enrichment ?? true);
       setScanInterval(s.scan_interval_hours ?? 0);
       setTranscodeEnabled(Boolean(s.transcode_enabled));
+      const sc = s.scrobble ?? {};
+      setLfmEnabled(Boolean(sc.lastfm_enabled));
+      setLfmKey(sc.lastfm_api_key ?? "");
+      setLfmSecret(sc.lastfm_api_secret ?? "");
+      setLfmSession(sc.lastfm_session_key ?? "");
+      setLbEnabled(Boolean(sc.listenbrainz_enabled));
+      setLbToken(sc.listenbrainz_token ?? "");
       setDetail(await api.healthDetail());
       try {
         setEmbedStatus(await api.discoveryStatus());
@@ -292,7 +319,184 @@ export function SettingsPage() {
         >
           Save playback settings
         </button>
+        <label className="mt-4 block text-xs text-muted">
+          Stream quality (client)
+          <select
+            className="input mt-1"
+            value={streamQuality}
+            onChange={(e) => {
+              const q = e.target.value as StreamQuality;
+              setStreamQuality(q);
+              setStreamQualityState(q);
+              flash(`Stream quality: ${q === "original" ? "Original" : `${q} kbps`}`);
+            }}
+          >
+            <option value="original">Original (lossless / native)</option>
+            <option value="320">320 kbps MP3</option>
+            <option value="256">256 kbps MP3</option>
+            <option value="192">192 kbps MP3</option>
+            <option value="128">128 kbps MP3</option>
+          </select>
+        </label>
+        <p className="mt-1 text-[11px] text-muted">
+          Lower bitrates need ffmpeg and re-encode on the fly (no seeking). Useful on mobile data.
+        </p>
       </Card>
+
+      <Card>
+        <h2 className="mb-1 text-sm font-semibold text-ink">Scrobbling</h2>
+        <p className="mb-3 text-xs text-muted">
+          Submit listens to Last.fm / ListenBrainz after 50% or 4 minutes of playback.
+        </p>
+        <label className="mb-3 flex items-center gap-2 text-xs text-muted">
+          <input
+            type="checkbox"
+            checked={lfmEnabled}
+            onChange={(e) => setLfmEnabled(e.target.checked)}
+          />
+          Last.fm
+        </label>
+        <div className="mb-3 grid gap-2 sm:grid-cols-2">
+          <input
+            className="input"
+            placeholder="API key"
+            value={lfmKey}
+            onChange={(e) => setLfmKey(e.target.value)}
+          />
+          <input
+            className="input"
+            placeholder="API secret"
+            type="password"
+            value={lfmSecret}
+            onChange={(e) => setLfmSecret(e.target.value)}
+          />
+          <input
+            className="input sm:col-span-2"
+            placeholder="Session key (or link below)"
+            value={lfmSession}
+            onChange={(e) => setLfmSession(e.target.value)}
+          />
+          <input
+            className="input"
+            placeholder="Last.fm username"
+            value={lfmUser}
+            onChange={(e) => setLfmUser(e.target.value)}
+          />
+          <input
+            className="input"
+            placeholder="Last.fm password"
+            type="password"
+            value={lfmPass}
+            onChange={(e) => setLfmPass(e.target.value)}
+          />
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary mb-4"
+          onClick={() =>
+            void api
+              .lastfmAuth({
+                username: lfmUser,
+                password: lfmPass,
+                api_key: lfmKey,
+                api_secret: lfmSecret,
+              })
+              .then((r) => {
+                setLfmSession(r.session_key);
+                setLfmEnabled(true);
+                flash("Last.fm linked");
+                return load();
+              })
+              .catch((err) => setError(err instanceof Error ? err.message : "Last.fm auth failed"))
+          }
+        >
+          Link Last.fm account
+        </button>
+        <label className="mb-2 flex items-center gap-2 text-xs text-muted">
+          <input
+            type="checkbox"
+            checked={lbEnabled}
+            onChange={(e) => setLbEnabled(e.target.checked)}
+          />
+          ListenBrainz
+        </label>
+        <input
+          className="input mb-3"
+          placeholder="ListenBrainz user token"
+          type="password"
+          value={lbToken}
+          onChange={(e) => setLbToken(e.target.value)}
+        />
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() =>
+            void api
+              .saveSettings({
+                scrobble: {
+                  lastfm_enabled: lfmEnabled,
+                  lastfm_api_key: lfmKey,
+                  lastfm_api_secret: lfmSecret,
+                  lastfm_session_key: lfmSession,
+                  listenbrainz_enabled: lbEnabled,
+                  listenbrainz_token: lbToken,
+                },
+              })
+              .then((s) => {
+                setSettings(s);
+                flash("Scrobble settings saved");
+              })
+              .catch((err) => setError(err instanceof Error ? err.message : "Save failed"))
+          }
+        >
+          Save scrobble settings
+        </button>
+      </Card>
+
+      <Card>
+        <h2 className="mb-1 text-sm font-semibold text-ink">Audio Equalizer & Crossfade</h2>
+        <p className="mb-3 text-xs text-muted">
+          Fine-tune frequency curves using Web Audio DSP and set track crossfade durations.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-xs text-muted">
+            EQ Preset
+            <select
+              className="input mt-1"
+              value={eqPreset}
+              onChange={(e) => {
+                const p = e.target.value as EqPreset;
+                setEqPresetState(p);
+                setEqPreset(p);
+                flash(`EQ Preset set to ${p}`);
+              }}
+            >
+              <option value="flat">Flat</option>
+              <option value="bass_boost">Bass Boost</option>
+              <option value="treble_boost">Treble Boost</option>
+              <option value="vocal">Vocal</option>
+              <option value="rock">Rock</option>
+              <option value="pop">Pop</option>
+            </select>
+          </label>
+          <label className="text-xs text-muted">
+            Crossfade (0–15 sec)
+            <input
+              type="number"
+              min={0}
+              max={15}
+              className="input mt-1 text-xs"
+              value={crossfadeSec}
+              onChange={(e) => {
+                const sec = Number(e.target.value);
+                setCrossfadeSec(sec);
+                setCrossfade(sec);
+              }}
+            />
+          </label>
+        </div>
+      </Card>
+
 
       <Card>
         <h2 className="mb-1 text-sm font-semibold text-ink">Local AI (free, private)</h2>

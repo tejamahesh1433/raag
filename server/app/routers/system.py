@@ -49,11 +49,13 @@ def _get_settings(db: DbSession) -> SettingsOut:
     except (TypeError, ValueError):
         hours = 0
     transcode = bool(_setting_json(db, "transcode_enabled", False))
+    scrobble = _setting_json(db, "scrobble", {})
     return SettingsOut(
         library_roots=roots if isinstance(roots, list) else [],
         ai=ai if isinstance(ai, dict) else {},
         scan_interval_hours=max(0, hours),
         transcode_enabled=transcode,
+        scrobble=scrobble if isinstance(scrobble, dict) else {},
     )
 
 
@@ -66,6 +68,8 @@ def _save_settings(db: DbSession, payload: SettingsUpdate, current: SettingsOut)
         _upsert_setting(db, "scan_interval_hours", int(payload.scan_interval_hours))
     if payload.transcode_enabled is not None:
         _upsert_setting(db, "transcode_enabled", bool(payload.transcode_enabled))
+    if payload.scrobble is not None:
+        _upsert_setting(db, "scrobble", {**current.scrobble, **payload.scrobble})
     db.commit()
     return _get_settings(db)
 
@@ -85,6 +89,41 @@ def update_settings(
         raise HTTPException(status_code=403, detail="Admin only")
     current = _get_settings(db)
     return _save_settings(db, payload, current)
+
+
+@router.post("/scrobble/lastfm-auth")
+def lastfm_auth(
+    payload: dict,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Exchange Last.fm username/password for a session key and store it."""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only")
+    from ..services.scrobble import lastfm_get_session
+
+    try:
+        session_key = lastfm_get_session(
+            str(payload.get("api_key") or ""),
+            str(payload.get("api_secret") or ""),
+            str(payload.get("username") or ""),
+            str(payload.get("password") or ""),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    current = _get_settings(db)
+    scrobble = {
+        **current.scrobble,
+        "lastfm_api_key": str(payload.get("api_key") or current.scrobble.get("lastfm_api_key") or ""),
+        "lastfm_api_secret": str(
+            payload.get("api_secret") or current.scrobble.get("lastfm_api_secret") or ""
+        ),
+        "lastfm_session_key": session_key,
+        "lastfm_enabled": True,
+    }
+    _upsert_setting(db, "scrobble", scrobble)
+    db.commit()
+    return {"session_key": session_key, "message": "Last.fm linked"}
 
 
 @router.get("/jobs", response_model=list[JobOut])

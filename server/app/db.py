@@ -101,6 +101,17 @@ def _seed_settings() -> None:
         )
         defaults.setdefault("scan_interval_hours", 0)
         defaults.setdefault("transcode_enabled", False)
+        defaults.setdefault(
+            "scrobble",
+            {
+                "lastfm_enabled": False,
+                "lastfm_api_key": "",
+                "lastfm_api_secret": "",
+                "lastfm_session_key": "",
+                "listenbrainz_enabled": False,
+                "listenbrainz_token": "",
+            },
+        )
         for key, value in defaults.items():
             if key not in existing:
                 s.add(Setting(key=key, value=json.dumps(value)))

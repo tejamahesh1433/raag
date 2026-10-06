@@ -106,3 +106,28 @@ def test_embed_index_and_similar(auth_client, tmp_path: Path):
         assert len(semantic.json()) >= 1
     finally:
         fake.stop()
+
+
+def test_radio_generation_and_stats(auth_client, tmp_path: Path):
+    lib = tmp_path / "lib"
+    make_wav(lib / "track1.wav", "Radio Seed", "Radio Artist", "Radio Album", genre="Pop")
+    make_wav(lib / "track2.wav", "Radio Match", "Radio Artist", "Radio Album", genre="Pop")
+    job = configure_and_scan(auth_client, lib)
+    assert job["status"] == "done"
+
+    tracks = auth_client.get("/api/library/tracks").json()["items"]
+    assert len(tracks) >= 2
+    seed_id = tracks[0]["id"]
+
+    radio_resp = auth_client.post(f"/api/discovery/radio/{seed_id}")
+    assert radio_resp.status_code == 200
+    queue = radio_resp.json()
+    assert len(queue) >= 2
+    assert queue[0]["id"] == seed_id
+
+    stats_resp = auth_client.get("/api/discovery/stats")
+    assert stats_resp.status_code == 200
+    stats = stats_resp.json()
+    assert stats["total_tracks"] >= 2
+    assert len(stats["top_artists"]) >= 1
+

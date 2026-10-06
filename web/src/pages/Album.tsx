@@ -1,11 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api";
 import { Artwork } from "../components/Artwork";
 import { TrackList } from "../components/TrackList";
 import { IconPlay, IconPlus } from "../components/icons";
+import { downloadTracks } from "../lib/offline";
 import type { Album, Track } from "../types";
 import { usePlayer } from "../store/player";
+
+function groupByDisc(tracks: Track[]): Array<{ disc: number | null; tracks: Track[] }> {
+  const discs = new Map<number | null, Track[]>();
+  for (const t of tracks) {
+    const key = t.disc_no ?? null;
+    const list = discs.get(key) ?? [];
+    list.push(t);
+    discs.set(key, list);
+  }
+  const keys = [...discs.keys()].sort((a, b) => {
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a - b;
+  });
+  const multi = keys.filter((k) => k !== null).length > 1;
+  if (!multi) return [{ disc: null, tracks }];
+  return keys.map((disc) => ({ disc, tracks: discs.get(disc)! }));
+}
 
 export function AlbumPage() {
   const { id } = useParams();
@@ -14,6 +33,7 @@ export function AlbumPage() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [enrich, setEnrich] = useState<Record<string, unknown> | null>(null);
+  const [dlMsg, setDlMsg] = useState("");
 
   useEffect(() => {
     if (!Number.isFinite(albumId)) return;
@@ -25,6 +45,8 @@ export function AlbumPage() {
       })
       .finally(() => setLoading(false));
   }, [albumId]);
+
+  const discGroups = useMemo(() => groupByDisc(tracks), [tracks]);
 
   if (loading) return <div className="px-8 py-12 text-sm text-muted">Loading…</div>;
   if (!album) return <div className="px-8 py-12 text-sm text-muted">Album not found.</div>;
@@ -87,11 +109,33 @@ export function AlbumPage() {
             >
               Fetch info
             </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setDlMsg("Downloading…");
+                void downloadTracks(tracks, (n, total) => setDlMsg(`${n}/${total}`))
+                  .then(() => setDlMsg("Saved offline"))
+                  .catch(() => setDlMsg("Download failed"));
+              }}
+            >
+              Save album offline
+            </button>
+            {dlMsg && <span className="self-center text-xs text-muted">{dlMsg}</span>}
           </div>
         </div>
       </header>
 
-      <TrackList tracks={tracks} showAlbum={false} artworkByAlbumId={artworkMap} />
+      {discGroups.map((g) => (
+        <section key={String(g.disc)} className="mt-2">
+          {g.disc !== null && (
+            <h2 className="mb-2 px-8 text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+              Disc {g.disc}
+            </h2>
+          )}
+          <TrackList tracks={g.tracks} showAlbum={false} artworkByAlbumId={artworkMap} />
+        </section>
+      ))}
     </div>
   );
 }

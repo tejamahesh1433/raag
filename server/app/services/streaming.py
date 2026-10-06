@@ -69,7 +69,10 @@ def _file_chunks(path: Path, start: int, end: int):
             yield data
 
 
-def stream_transcoded(path: Path) -> StreamingResponse:
+ALLOWED_BITRATES = {128, 192, 256, 320}
+
+
+def stream_transcoded(path: Path, bitrate_kbps: int = 192) -> StreamingResponse:
     """Pipe file through ffmpeg → MP3. Seeking/Range not supported for this path."""
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Media file not found")
@@ -78,6 +81,7 @@ def stream_transcoded(path: Path) -> StreamingResponse:
             status_code=415,
             detail="Format needs ffmpeg transcoding, but ffmpeg was not found on PATH",
         )
+    kbps = bitrate_kbps if bitrate_kbps in ALLOWED_BITRATES else 192
 
     cmd = [
         config.FFMPEG_PATH,
@@ -90,7 +94,7 @@ def stream_transcoded(path: Path) -> StreamingResponse:
         "-acodec",
         "libmp3lame",
         "-ab",
-        "192k",
+        f"{kbps}k",
         "-f",
         "mp3",
         "pipe:1",
@@ -125,7 +129,7 @@ def stream_transcoded(path: Path) -> StreamingResponse:
         media_type="audio/mpeg",
         headers={
             "Accept-Ranges": "none",
-            "X-Raag-Transcode": "ffmpeg-mp3",
+            "X-Raag-Transcode": f"ffmpeg-mp3-{kbps}k",
             "Cache-Control": "no-store",
         },
     )
@@ -181,8 +185,25 @@ def stream_file(path: Path, range_header: str | None) -> Response:
     )
 
 
-def stream_track_file(path: Path, range_header: str | None, *, transcode: bool) -> Response:
-    """Stream native bytes, or ffmpeg→mp3 when enabled and format needs help."""
+def stream_track_file(
+    path: Path,
+    range_header: str | None,
+    *,
+    transcode: bool,
+    quality: str | None = None,
+) -> Response:
+    """Stream native bytes, or ffmpeg→mp3 when enabled / quality requests a bitrate.
+
+    quality: original | 128 | 192 | 256 | 320
+    """
+    q = (quality or "original").strip().lower()
+    if q in {"128", "192", "256", "320"}:
+        if not ffmpeg_available():
+            raise HTTPException(
+                status_code=415,
+                detail="Quality transcoding needs ffmpeg on PATH",
+            )
+        return stream_transcoded(path, int(q))
     if transcode and needs_transcode(path):
-        return stream_transcoded(path)
+        return stream_transcoded(path, 192)
     return stream_file(path, range_header)

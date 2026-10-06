@@ -343,6 +343,7 @@ def stream_track(
     request: Request,
     db: DbSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    quality: str = Query("original"),
 ):
     track = db.query(Track).filter(Track.id == track_id).first()
     if track is None:
@@ -361,6 +362,7 @@ def stream_track(
         Path(track.path),
         request.headers.get("range"),
         transcode=transcode,
+        quality=quality,
     )
 
 
@@ -469,6 +471,14 @@ def record_play(
     track.play_count = (track.play_count or 0) + 1
     db.add(PlayEvent(user_id=user.id, track_id=track_id, played_at=utcnow()))
     db.commit()
+    try:
+        from ..services.scrobble import scrobble_track
+
+        cfg_row = db.query(Setting).filter(Setting.key == "scrobble").first()
+        cfg = json.loads(cfg_row.value) if cfg_row and cfg_row.value else {}
+        scrobble_track(track, cfg if isinstance(cfg, dict) else {})
+    except Exception:
+        pass
     return MessageOut(message="played")
 
 

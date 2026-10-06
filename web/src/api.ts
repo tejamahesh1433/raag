@@ -109,10 +109,26 @@ export const api = {
   track: (id: number) => request<Track>(`/api/tracks/${id}`),
 
   // playback
-  streamUrl: (id: number) => `/api/tracks/${id}/stream`,
+  streamUrl: (id: number, quality?: string) => {
+    const q = quality ?? (typeof localStorage !== "undefined"
+      ? localStorage.getItem("raag-stream-quality") || "original"
+      : "original");
+    if (!q || q === "original") return `/api/tracks/${id}/stream`;
+    return `/api/tracks/${id}/stream?quality=${encodeURIComponent(q)}`;
+  },
   artworkUrl: (id: number) => `/api/artwork/${id}`,
   recordPlayed: (id: number) =>
     request<{ message: string }>(`/api/tracks/${id}/played`, { method: "POST" }),
+  lastfmAuth: (payload: {
+    username: string;
+    password: string;
+    api_key: string;
+    api_secret: string;
+  }) =>
+    request<{ session_key: string; message: string }>("/api/scrobble/lastfm-auth", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   favorite: (id: number) =>
     request<Track>(`/api/tracks/${id}/favorite`, { method: "POST" }),
   unfavorite: (id: number) =>
@@ -207,6 +223,16 @@ export const api = {
       `/api/tracks/${trackId}/lyrics`,
       { method: "POST" },
     ),
+  generateRadio: (trackId: number, limit = 25) =>
+    request<Track[]>(`/api/discovery/radio/${trackId}?limit=${limit}`, { method: "POST" }),
+  listeningStats: () =>
+    request<{
+      total_tracks: number;
+      total_duration_seconds: number;
+      top_artists: Array<{ artist: string; count: number }>;
+      top_genres: Array<{ genre: string; count: number }>;
+    }>("/api/discovery/stats"),
+
 
   // organization (M4/M5)
   setupStatus: () =>
