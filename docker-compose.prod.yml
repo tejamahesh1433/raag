@@ -1,0 +1,44 @@
+# Raag on tejaserver — LAN + Cloudflare Tunnel (music.tejainfo.xyz)
+services:
+  music:
+    build: .
+    container_name: music-server
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    environment:
+      MUSIC_COOKIE_SECURE: "1"
+      MUSIC_AUTH_REQUIRED: "${MUSIC_AUTH_REQUIRED:-1}"
+      MUSIC_CORS_ORIGINS: "https://music.tejainfo.xyz,http://192.168.4.43:8765,http://127.0.0.1:8765"
+      MUSIC_ADMIN_USER: "${MUSIC_ADMIN_USER:-teja}"
+      MUSIC_ADMIN_PASSWORD: "${MUSIC_ADMIN_PASSWORD}"
+      MUSIC_LIBRARY_ROOTS: '["/music"]'
+    volumes:
+      - music-data:/data
+      - ${MUSIC_LIBRARY_HOST_PATH:-./library}:/music:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - raag
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: raag-cloudflared
+    restart: unless-stopped
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
+    depends_on:
+      - music
+    networks:
+      - raag
+
+networks:
+  raag:
+    driver: bridge
+
+volumes:
+  music-data:
