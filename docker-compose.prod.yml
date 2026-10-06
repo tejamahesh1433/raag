@@ -8,7 +8,7 @@ services:
       - "8765:8765"
     environment:
       MUSIC_COOKIE_SECURE: "1"
-      MUSIC_AUTH_REQUIRED: "${MUSIC_AUTH_REQUIRED:-1}"
+      MUSIC_AUTH_REQUIRED: "${MUSIC_AUTH_REQUIRED:-0}"
       MUSIC_CORS_ORIGINS: "https://music.tejainfo.xyz,http://192.168.4.43:8765,http://127.0.0.1:8765"
       MUSIC_ADMIN_USER: "${MUSIC_ADMIN_USER:-teja}"
       MUSIC_ADMIN_PASSWORD: "${MUSIC_ADMIN_PASSWORD}"
