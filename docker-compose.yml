@@ -44,6 +44,16 @@ services:
   #   #           count: all
   #   #           capabilities: [gpu]
 
+  # Cloudflare tunnel — set TUNNEL_TOKEN in .env on the host (never commit the token).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: raag-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: "${TUNNEL_TOKEN}"
+    depends_on: [music]
+
   # Optional HTTPS reverse proxy for music.tejainfo.xyz — see docs/deploy.md
   caddy:
     profiles: ["caddy"]
