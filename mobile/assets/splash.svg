@@ -1,0 +1,20 @@
+<svg width="1284" height="2778" viewBox="0 0 1284 2778" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#14241c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0a140d;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#b87914;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e0a82e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="1284" height="2778" fill="url(#bg)"/>
+  <g transform="translate(642, 1000)">
+    <!-- Music note -->
+    <path d="M0 -180 L0 -300 C-60 -330 -120 -330 -120 -270 C-120 -210 -60 -210 -60 -150 L0 0 C60 0 60 0 60 0 L60 -300 C120 -330 180 -330 180 -270 C180 -210 120 -210 120 -150 L0 0" fill="url(#accent)"/>
+    <circle cx="0" cy="120" r="50" fill="url(#accent)"/>
+    <circle cx="120" cy="25" r="50" fill="url(#accent)"/>
+    <text x="0" y="300" text-anchor="middle" font-family="Georgia, serif" font-size="96" font-weight="bold" fill="#e0a82e">Raag</text>
+  </g>
+</svg>

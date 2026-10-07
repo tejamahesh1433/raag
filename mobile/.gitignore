@@ -1,0 +1,17 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.expo*
+
+# Native build folders
+android/app/build/
+android/.gradle/
+android/.idea/
+android/local.properties
+android/app/.cxx/
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+*.log
