@@ -3,7 +3,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session as DbSession
 
 from .. import config
-from ..deps import SESSION_COOKIE, get_current_user, get_db
+from ..deps import SESSION_COOKIE, ensure_guest_user, get_current_user, get_db
 from ..models import Session as SessionModel, User
 from ..schemas import CreateUserIn, LoginIn, MessageOut, SessionOut, SetupIn, UserOut
 from ..security import hash_password, new_session_token, rate_limiter, session_expiry, verify_password
@@ -59,6 +59,10 @@ def setup(payload: SetupIn, response: Response, db: DbSession = Depends(get_db))
 
 @router.post("/login", response_model=UserOut)
 def login(payload: LoginIn, request: Request, response: Response, db: DbSession = Depends(get_db)):
+    if not config.AUTH_REQUIRED:
+        user = ensure_guest_user(db)
+        _start_session(response, db, user)
+        return user
     key = _client_key(request, payload.username)
     if not rate_limiter.check(key):
         raise HTTPException(status_code=429, detail="Too many attempts, try again later")
