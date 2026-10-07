@@ -425,10 +425,16 @@ export function MiniPlayer() {
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("mediaSession" in navigator) || !current) return;
+    // Artwork must be an absolute URL so AirPlay receivers (Apple TV, HomePod, etc.)
+    // can fetch it independently — relative paths only resolve in the browser.
+    const artworkEntries = artworkId
+      ? [{ src: `${window.location.origin}/api/artwork/${artworkId}`, sizes: "512x512", type: "image/jpeg" }]
+      : [];
     navigator.mediaSession.metadata = new MediaMetadata({
       title: current.title,
       artist: current.artist,
       album: current.album,
+      artwork: artworkEntries,
     });
     const ms = navigator.mediaSession;
     ms.setActionHandler("play", () => usePlayer.getState().setPlaying(true));
@@ -439,7 +445,7 @@ export function MiniPlayer() {
     });
     ms.setActionHandler("nexttrack", () => usePlayer.getState().next());
     ms.setActionHandler("previoustrack", () => usePlayer.getState().prev());
-  }, [current]);
+  }, [current, artworkId]);
 
   const reportedRef = useRef<number | null>(null);
   useEffect(() => {
