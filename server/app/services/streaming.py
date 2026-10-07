@@ -11,7 +11,9 @@ from fastapi.responses import Response, StreamingResponse
 
 from .. import config
 
-CHUNK_SIZE = 64 * 1024
+CHUNK_SIZE = 256 * 1024  # 256 KB — fewer round-trips through Cloudflare tunnel
+
+_ffmpeg_available: bool | None = None  # cached after first check
 
 _CONTENT_TYPES = {
     "mp3": "audio/mpeg",
@@ -50,7 +52,10 @@ def _content_type(path: Path) -> str:
 
 
 def ffmpeg_available() -> bool:
-    return shutil.which(config.FFMPEG_PATH) is not None
+    global _ffmpeg_available
+    if _ffmpeg_available is None:
+        _ffmpeg_available = shutil.which(config.FFMPEG_PATH) is not None
+    return _ffmpeg_available
 
 
 def needs_transcode(path: Path) -> bool:
@@ -131,6 +136,7 @@ def stream_transcoded(path: Path, bitrate_kbps: int = 192) -> StreamingResponse:
             "Accept-Ranges": "none",
             "X-Raag-Transcode": f"ffmpeg-mp3-{kbps}k",
             "Cache-Control": "no-store",
+            "X-Accel-Buffering": "no",
         },
     )
 
@@ -143,9 +149,16 @@ def stream_file(path: Path, range_header: str | None) -> Response:
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Media file not found")
 
-    file_size = path.stat().st_size
+    stat = path.stat()
+    file_size = stat.st_size
     content_type = _content_type(path)
-    base_headers = {"Accept-Ranges": "bytes"}
+    etag = f'"{int(stat.st_mtime)}-{file_size}"'
+    base_headers = {
+        "Accept-Ranges": "bytes",
+        "ETag": etag,
+        "Cache-Control": "private, max-age=3600",
+        "X-Accel-Buffering": "no",  # prevent nginx buffering — critical for low latency
+    }
 
     if not range_header:
         return StreamingResponse(

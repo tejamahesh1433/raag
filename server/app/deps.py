@@ -42,21 +42,21 @@ def get_current_user(
     session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> User:
     if session_token:
-        row = (
-            db.query(SessionModel)
+        from datetime import datetime, timezone
+
+        result = (
+            db.query(SessionModel, User)
+            .join(User, User.id == SessionModel.user_id)
             .filter(SessionModel.token == session_token)
             .first()
         )
-        if row is not None:
-            from datetime import datetime, timezone
-
+        if result is not None:
+            row, user = result
             expires = row.expires_at
             if expires.tzinfo is None:
                 expires = expires.replace(tzinfo=timezone.utc)
-            if expires >= datetime.now(timezone.utc):
-                user = db.query(User).filter(User.id == row.user_id).first()
-                if user is not None:
-                    return user
+            if expires >= datetime.now(timezone.utc) and user is not None:
+                return user
 
     if not config.AUTH_REQUIRED:
         return ensure_guest_user(db)

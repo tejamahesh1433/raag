@@ -2,11 +2,26 @@
 import base64
 import json
 import re
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session as DbSession
+
+# In-process settings cache — avoids repeated DB hits on every stream request.
+_SETTINGS_CACHE: dict[str, tuple[str | None, float]] = {}
+_SETTINGS_TTL = 60.0  # seconds
+
+
+def _cached_setting(db: DbSession, key: str) -> str | None:
+    entry = _SETTINGS_CACHE.get(key)
+    if entry is not None and (time.monotonic() - entry[1]) < _SETTINGS_TTL:
+        return entry[0]
+    row = db.query(Setting).filter(Setting.key == key).first()
+    value = row.value if row else None
+    _SETTINGS_CACHE[key] = (value, time.monotonic())
+    return value
 
 from ..deps import get_current_user, get_db
 from ..models import Album, Artist, Favorite, Job, PlayEvent, Setting, Track, User, utcnow
@@ -349,15 +364,14 @@ def stream_track(
     if track is None:
         raise HTTPException(status_code=404, detail="Track not found")
     # Defense: only serve paths that live under a configured library root.
-    if not _is_under_roots(track.path):
+    if not _is_under_roots(track.path, db):
         raise HTTPException(status_code=403, detail="Track path outside configured roots")
-    transcode_row = db.query(Setting).filter(Setting.key == "transcode_enabled").first()
+    transcode_val = _cached_setting(db, "transcode_enabled")
     transcode = False
-    if transcode_row and transcode_row.value:
-        try:
-            transcode = bool(json.loads(transcode_row.value))
-        except json.JSONDecodeError:
-            transcode = False
+    try:
+        transcode = bool(json.loads(transcode_val)) if transcode_val else False
+    except (json.JSONDecodeError, TypeError):
+        pass
     return stream_track_file(
         Path(track.path),
         request.headers.get("range"),
@@ -366,13 +380,9 @@ def stream_track(
     )
 
 
-def _is_under_roots(path: str) -> bool:
-    setting = None
-    from ..db import SessionLocal
-
-    with SessionLocal() as s:
-        setting = s.query(Setting).filter(Setting.key == "library_roots").first()
-        roots = json.loads(setting.value) if setting and setting.value else []
+def _is_under_roots(path: str, db: DbSession) -> bool:
+    roots_val = _cached_setting(db, "library_roots")
+    roots = json.loads(roots_val) if roots_val else []
     if not roots:
         return False
     resolved = Path(path).resolve()
