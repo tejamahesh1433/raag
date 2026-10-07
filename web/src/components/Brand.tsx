@@ -16,7 +16,7 @@ export function BrandLogo({
       alt=""
       width={size}
       height={size}
-      className={`shrink-0 rounded-[22%] shadow-lg ${className}`}
+      className={`brand-mark shrink-0 ${className}`}
       aria-hidden
     />
   );
@@ -31,10 +31,10 @@ export function BrandWordmark({
 }) {
   const sizeClass =
     size === "lg"
-      ? "text-4xl sm:text-5xl"
+      ? "text-5xl sm:text-6xl"
       : size === "sm"
         ? "text-xl"
-        : "text-display-sm text-2xl";
+        : "text-display-sm text-3xl";
   return (
     <span className={`font-display leading-none tracking-tight text-ink ${sizeClass} ${className}`}>
       {APP_NAME}

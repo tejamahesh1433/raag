@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import {
   addAudioListener,
@@ -11,11 +12,15 @@ import {
   playUrl,
   preloadNext,
   remainingTime,
+  resumeAudioContext,
   setNormalize,
   showAirPlayPicker,
   stopAudio,
   ensureAnalyser,
   isGapless,
+  setSleepTimer,
+  clearSleepTimer,
+  getSleepTimerRemaining,
 } from "../audioEngine";
 import { SpectrumVisualizer } from "./SpectrumVisualizer";
 import { getStreamQuality, setStreamQuality, type StreamQuality } from "../lib/streamQuality";
@@ -33,6 +38,7 @@ import {
   IconHeart,
   IconPause,
   IconPlay,
+  IconQueue,
   IconRepeat,
   IconRepeatOne,
   IconShuffle,
@@ -45,6 +51,134 @@ function fmt(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function SeekBar({
+  progress,
+  duration,
+  onSeek,
+  variant = "dock",
+}: {
+  progress: number;
+  duration: number;
+  onSeek: (seconds: number) => void;
+  variant?: "dock" | "full";
+}) {
+  const dragging = useRef(false);
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const pct = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+
+  const seekAt = (clientX: number) => {
+    const el = barRef.current;
+    if (!el || duration <= 0) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    onSeek(ratio * duration);
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    dragging.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    seekAt(e.clientX);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging.current) return;
+    e.stopPropagation();
+    seekAt(e.clientX);
+  };
+
+  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    e.stopPropagation();
+    seekAt(e.clientX);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+  };
+
+  if (variant === "dock") {
+    return (
+      <div
+        ref={barRef}
+        role="slider"
+        aria-label="Seek"
+        aria-valuemin={0}
+        aria-valuemax={Math.floor(duration) || 0}
+        aria-valuenow={Math.floor(progress) || 0}
+        tabIndex={0}
+        className="group/progress relative h-3 w-full cursor-ew-resize touch-none bg-ink/10"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (!duration) return;
+          if (e.key === "ArrowRight") {
+            e.preventDefault();
+            onSeek(Math.min(duration, progress + 5));
+          } else if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            onSeek(Math.max(0, progress - 5));
+          }
+        }}
+      >
+        <div
+          className="absolute inset-y-0 left-0 bg-accent transition-[width] duration-75 group-active/progress:transition-none"
+          style={{ width: `${pct}%` }}
+        />
+        <span
+          className="pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink opacity-0 shadow-sm transition-opacity group-hover/progress:opacity-100 group-active/progress:opacity-100"
+          style={{ left: `${pct}%` }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={barRef}
+      role="slider"
+      aria-label="Seek"
+      aria-valuemin={0}
+      aria-valuemax={Math.floor(duration) || 0}
+      aria-valuenow={Math.floor(progress) || 0}
+      tabIndex={0}
+      className="group relative flex h-8 w-full cursor-ew-resize touch-none items-center"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onKeyDown={(e) => {
+        if (!duration) return;
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          onSeek(Math.min(duration, progress + 5));
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          onSeek(Math.max(0, progress - 5));
+        }
+      }}
+    >
+      <div className="relative h-1.5 w-full rounded-sm bg-white/15">
+        <div
+          className="absolute inset-y-0 left-0 rounded-sm bg-accent transition-[width] duration-75 group-active:transition-none"
+          style={{ width: `${pct}%` }}
+        />
+        <span
+          className="pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white opacity-70 shadow group-hover:opacity-100 group-active:opacity-100"
+          style={{ left: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 const artworkCache = new Map<number, number | null>();
@@ -63,10 +197,6 @@ export function MiniPlayer() {
   const [lyricsError, setLyricsError] = useState("");
   const [similar, setSimilar] = useState<Array<{ track: Track; score: number }>>([]);
   const [panel, setPanel] = useState<"upnext" | "similar" | "lyrics">("upnext");
-  const [sleepMins, setSleepMins] = useState<number | null>(null);
-  const [sleepLeft, setSleepLeft] = useState(0);
-  const sleepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sleepTick = useRef<ReturnType<typeof setInterval> | null>(null);
   const [normalize, setNormalizeState] = useState(isNormalizeOn());
   const [streamQuality, setStreamQualityState] = useState<StreamQuality>(getStreamQuality());
   const [offlineSaved, setOfflineSaved] = useState(false);
@@ -75,6 +205,9 @@ export function MiniPlayer() {
   const scrobbledRef = useRef<number | null>(null);
   const handoffLock = useRef(false);
   const skipLoadRef = useRef(false);
+  const [sleepDockOpen, setSleepDockOpen] = useState(false);
+  const [sleepDockRemaining, setSleepDockRemaining] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const queue = usePlayer((s) => s.queue);
   const index = usePlayer((s) => s.index);
@@ -84,6 +217,23 @@ export function MiniPlayer() {
   const repeat = usePlayer((s) => s.repeat);
   const current = index >= 0 ? queue[index] ?? null : null;
   const upNext = current ? queue.slice(index + 1) : [];
+
+  // Resume and retry play after AirPlay device switch.
+  useEffect(() => {
+    const onTargetChanged = () => {
+      resumeAudioContext();
+      if (!usePlayer.getState().playing) return;
+      window.setTimeout(() => {
+        resumeAudioContext();
+        void getAudio().play().catch((err: unknown) => {
+          if (err instanceof DOMException && err.name === "AbortError") return;
+          usePlayer.getState().setPlaying(false);
+        });
+      }, 600);
+    };
+    window.addEventListener("raag:airplay-target-changed", onTargetChanged);
+    return () => window.removeEventListener("raag:airplay-target-changed", onTargetChanged);
+  }, []);
 
   // Dual-buffer listeners — active element swaps during gapless handoff.
   useEffect(() => {
@@ -126,7 +276,10 @@ export function MiniPlayer() {
       .then(() => {
         if (!usePlayer.getState().playing) pauseAudio();
       })
-      .catch(() => usePlayer.getState().setPlaying(false));
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        usePlayer.getState().setPlaying(false);
+      });
     setProgress(0);
     const s = usePlayer.getState();
     const nextTrack = s.queue[s.index + 1];
@@ -138,7 +291,12 @@ export function MiniPlayer() {
     if (!current) return;
     const audio = getAudio();
     if (playing) {
-      void audio.play().catch(() => usePlayer.getState().setPlaying(false));
+      resumeAudioContext();
+      void audio.play().catch((err: unknown) => {
+        // AbortError is a transient interruption (e.g. AirPlay device switch) — don't stop.
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        usePlayer.getState().setPlaying(false);
+      });
     } else {
       audio.pause();
     }
@@ -218,29 +376,50 @@ export function MiniPlayer() {
     });
   }, []);
 
-  // Followers apply host state
+  // Followers apply host state (track + position + play/pause)
   useEffect(() => {
     return onPartyMessage((msg) => {
       if (msg.type !== "state") return;
       const meta = getPartyMeta();
       if (meta.role !== "listener") return;
       const state = msg.state as {
-        trackId?: number;
+        trackId?: number | null;
         playing?: boolean;
         position?: number;
         queueIds?: number[];
         index?: number;
       };
-      // Soft sync: only seek if drift is large; track changes via queue if present
-      if (typeof state.position === "number") {
-        const audio = getAudio();
-        if (Math.abs(audio.currentTime - state.position) > 2) {
-          audio.currentTime = state.position;
+
+      const applyTransport = () => {
+        if (typeof state.position === "number") {
+          const audio = getAudio();
+          if (Math.abs(audio.currentTime - state.position) > 2) {
+            audio.currentTime = state.position;
+          }
         }
+        if (typeof state.playing === "boolean") {
+          usePlayer.getState().setPlaying(state.playing);
+        }
+      };
+
+      const hostTrackId = state.trackId ?? null;
+      const localId = usePlayer.getState().current()?.id ?? null;
+      if (hostTrackId && hostTrackId !== localId) {
+        const queue = usePlayer.getState().queue;
+        const idx = queue.findIndex((t) => t.id === hostTrackId);
+        if (idx >= 0) {
+          skipLoadRef.current = false;
+          usePlayer.getState().jumpTo(idx);
+          window.setTimeout(applyTransport, 400);
+        } else {
+          void api.track(hostTrackId).then((track) => {
+            usePlayer.getState().playNow([track], 0);
+            window.setTimeout(applyTransport, 400);
+          }).catch(() => undefined);
+        }
+        return;
       }
-      if (typeof state.playing === "boolean") {
-        usePlayer.getState().setPlaying(state.playing);
-      }
+      applyTransport();
     });
   }, []);
 
@@ -273,12 +452,12 @@ export function MiniPlayer() {
     void isOffline(current.id).then(setOfflineSaved).catch(() => setOfflineSaved(false));
   }, [current?.id]);
 
-  // Scrobble / play-count at Last.fm rule: 50% or 4 minutes.
+  // Scrobble / play-count at Last.fm rule: 50% or 4 minutes (both audio buffers).
   useEffect(() => {
     if (!current || !playing) return;
-    const audio = getAudio();
     const maybeScrobble = () => {
       if (scrobbledRef.current === current.id) return;
+      const audio = getAudio();
       const t = audio.currentTime;
       const d = audio.duration || current.duration || 0;
       if (t >= 240 || (d > 0 && t >= d * 0.5)) {
@@ -287,8 +466,7 @@ export function MiniPlayer() {
         void api.recordPlayed(current.id).catch(() => undefined);
       }
     };
-    audio.addEventListener("timeupdate", maybeScrobble);
-    return () => audio.removeEventListener("timeupdate", maybeScrobble);
+    return addAudioListener("timeupdate", maybeScrobble);
   }, [current, playing]);
 
   useEffect(() => {
@@ -388,37 +566,27 @@ export function MiniPlayer() {
     }
   };
 
-  const seekFromEvent = (e: { currentTarget: HTMLDivElement; clientX: number }) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    seek(ratio * duration);
-  };
-
   const startSleep = (mins: number) => {
-    if (sleepTimer.current) clearTimeout(sleepTimer.current);
-    if (sleepTick.current) clearInterval(sleepTick.current);
-    const endMs = Date.now() + mins * 60_000;
-    setSleepMins(mins);
-    setSleepLeft(mins * 60);
-    sleepTimer.current = setTimeout(() => {
-      usePlayer.getState().setPlaying(false);
-      setSleepMins(null);
-      setSleepLeft(0);
-      if (sleepTick.current) clearInterval(sleepTick.current);
-    }, mins * 60_000);
-    sleepTick.current = setInterval(() => {
-      const rem = Math.max(0, Math.ceil((endMs - Date.now()) / 1000));
-      setSleepLeft(rem);
-      if (rem === 0) clearInterval(sleepTick.current!);
-    }, 1000);
+    setSleepTimer(mins);
+    setSleepDockRemaining(mins * 60);
   };
 
   const cancelSleep = () => {
-    if (sleepTimer.current) clearTimeout(sleepTimer.current);
-    if (sleepTick.current) clearInterval(sleepTick.current);
-    setSleepMins(null);
-    setSleepLeft(0);
+    clearSleepTimer();
+    setSleepDockRemaining(null);
   };
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSleepDockRemaining(getSleepTimerRemaining());
+    }, 1_000);
+    const onFired = () => setSleepDockRemaining(null);
+    window.addEventListener("raag:sleep-timer-fired", onFired);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("raag:sleep-timer-fired", onFired);
+    };
+  }, []);
 
   const toggleNormalize = () => {
     const next = !normalize;
@@ -444,7 +612,6 @@ export function MiniPlayer() {
 
   const bottomClass = "bottom-[calc(4.25rem+env(safe-area-inset-bottom))] lg:bottom-0";
   const artUrl = artworkId ? api.artworkUrl(artworkId) : null;
-  const progressPct = duration ? `${(progress / duration) * 100}%` : "0%";
 
   const transport = (size: "dock" | "full") => (
     <div
@@ -474,11 +641,7 @@ export function MiniPlayer() {
       </button>
       <button
         type="button"
-        className={
-          size === "full"
-            ? "mx-1 flex h-16 w-16 items-center justify-center rounded-full bg-ink text-surface shadow-xl transition-transform hover:scale-105"
-            : "flex h-12 w-12 items-center justify-center rounded-full bg-ink text-surface shadow-lg transition-transform hover:scale-105"
-        }
+        className={size === "full" ? "play-btn play-btn-lg" : "play-btn play-btn-sm"}
         onClick={() => usePlayer.getState().toggle()}
         title={playing ? "Pause" : "Play"}
       >
@@ -508,6 +671,69 @@ export function MiniPlayer() {
           <IconRepeat size={size === "full" ? 20 : 18} />
         )}
       </button>
+
+      {size === "dock" && (
+        <>
+          <button
+            type="button"
+            className="btn-icon relative hidden sm:flex"
+            onClick={(e) => { e.stopPropagation(); navigate("/queue"); }}
+            title={`Queue (${queue.length} tracks)`}
+          >
+            <IconQueue size={18} />
+            {queue.length > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] text-white">
+                {queue.length}
+              </span>
+            )}
+          </button>
+
+          <div className="relative hidden sm:block">
+            <button
+              type="button"
+              className={`btn-icon ${sleepDockRemaining !== null ? "btn-icon-active" : ""}`}
+              onClick={(e) => { e.stopPropagation(); setSleepDockOpen((v) => !v); }}
+              title="Sleep timer"
+            >
+              <IconClock size={18} />
+              {sleepDockRemaining !== null && (
+                <span className="ml-0.5 text-[10px] tabular-nums">{fmt(sleepDockRemaining)}</span>
+              )}
+            </button>
+            {sleepDockOpen && (
+              <div
+                className="absolute bottom-full right-0 z-50 mb-2 min-w-[120px] rounded-xl border border-border bg-panel p-1.5 shadow-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {(["Off", "15 min", "30 min", "45 min", "60 min", "90 min"] as const).map(
+                  (label, i) => {
+                    const mins = [0, 15, 30, 45, 60, 90][i]
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        className="w-full rounded-lg px-3 py-1.5 text-left text-sm text-ink hover:bg-ink/5"
+                        onClick={() => {
+                          if (mins === 0) {
+                            clearSleepTimer();
+                            setSleepDockRemaining(null);
+                          } else {
+                            setSleepTimer(mins);
+                            setSleepDockRemaining(mins * 60);
+                          }
+                          setSleepDockOpen(false);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 
@@ -527,18 +753,7 @@ export function MiniPlayer() {
             }
           }}
         >
-          <div
-            className="group/progress h-1 w-full cursor-pointer bg-white/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              seekFromEvent(e);
-            }}
-          >
-            <div
-              className="relative h-full bg-gradient-to-r from-accent to-white transition-[width] duration-150"
-              style={{ width: progressPct }}
-            />
-          </div>
+          <SeekBar progress={progress} duration={duration} onSeek={seek} variant="dock" />
 
           <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-5 sm:px-6">
             <Artwork artworkId={artworkId} size={52} className="!rounded-xl shadow-lg" />
@@ -579,7 +794,7 @@ export function MiniPlayer() {
                 className="now-playing-bg"
                 style={{
                   background:
-                    "radial-gradient(circle at 40% 40%, rgba(251,113,133,0.45), transparent 55%), #12121a",
+                    "radial-gradient(circle at 40% 40%, rgba(184,121,20,0.4), transparent 55%), #14241c",
                 }}
               />
             )}
@@ -588,7 +803,7 @@ export function MiniPlayer() {
             <div className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4 py-4 sm:px-7">
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3.5 py-2 text-xs text-ink backdrop-blur-md hover:bg-white/12"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-xs text-panel-2 backdrop-blur-md hover:bg-white/15"
                 onClick={() => setExpanded(false)}
               >
                 <IconChevronDown size={16} />
@@ -596,7 +811,7 @@ export function MiniPlayer() {
               </button>
               <button
                 type="button"
-                className={`btn-icon !bg-white/8 !text-ink backdrop-blur-md ${favorite ? "!text-accent-bright" : ""}`}
+                className={`btn-icon !bg-white/10 !text-panel-2 backdrop-blur-md ${favorite ? "!text-accent-bright" : ""}`}
                 onClick={() => void toggleFavorite()}
                 title={favorite ? "Unsave" : "Save"}
               >
@@ -622,9 +837,9 @@ export function MiniPlayer() {
               </div>
               <h1 className="now-playing-title text-3xl sm:text-4xl">{current.title}</h1>
               <p className="meta-line mt-2 text-sm">
-                <span className="font-semibold tracking-wide text-ink/90">{current.artist}</span>
-                <span className="text-muted/50"> · </span>
-                {current.album}
+                <span className="font-semibold tracking-wide text-panel-2/90">{current.artist}</span>
+                <span className="text-panel-2/40"> · </span>
+                <span className="text-panel-2/70">{current.album}</span>
               </p>
 
               <div className={`now-playing-bars ${playing ? "is-playing" : ""}`} aria-hidden>
@@ -633,7 +848,7 @@ export function MiniPlayer() {
               <SpectrumVisualizer active={expanded && playing} />
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                <label className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] text-muted backdrop-blur-md">
+                <label className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] text-muted backdrop-blur-md">
                   Quality
                   <select
                     className="bg-transparent text-ink outline-none"
@@ -659,7 +874,7 @@ export function MiniPlayer() {
                 </label>
                 <button
                   type="button"
-                  className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] text-ink backdrop-blur-md hover:bg-white/12"
+                  className="rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] text-ink backdrop-blur-md hover:bg-white/12"
                   onClick={() => {
                     void (async () => {
                       try {
@@ -681,7 +896,7 @@ export function MiniPlayer() {
                 {isCastAvailable() && (
                   <button
                     type="button"
-                    className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] text-ink backdrop-blur-md hover:bg-white/12"
+                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] text-ink backdrop-blur-md hover:bg-white/12"
                     onClick={() => {
                       void castMedia({
                         contentUrl: absoluteUrl(api.streamUrl(current.id)),
@@ -698,7 +913,7 @@ export function MiniPlayer() {
                 {airPlayAvailable() && (
                   <button
                     type="button"
-                    className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] text-ink backdrop-blur-md hover:bg-white/12"
+                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] text-ink backdrop-blur-md hover:bg-white/12"
                     onClick={() => showAirPlayPicker()}
                   >
                     AirPlay
@@ -707,18 +922,8 @@ export function MiniPlayer() {
               </div>
 
               <div className="mt-6 w-full">
-                <div
-                  className="group h-1.5 w-full cursor-pointer rounded-full bg-white/15"
-                  onClick={seekFromEvent}
-                >
-                  <div
-                    className="relative h-full rounded-full bg-gradient-to-r from-accent to-white transition-[width] duration-150"
-                    style={{ width: progressPct }}
-                  >
-                    <span className="absolute -right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-white opacity-0 shadow group-hover:opacity-100" />
-                  </div>
-                </div>
-                <div className="mt-2 flex justify-between text-xs tabular-nums text-muted">
+                <SeekBar progress={progress} duration={duration} onSeek={seek} variant="full" />
+                <div className="mt-1 flex justify-between text-xs tabular-nums text-muted">
                   <span>{fmt(progress)}</span>
                   <span>{fmt(duration)}</span>
                 </div>
@@ -729,14 +934,14 @@ export function MiniPlayer() {
               {/* Sleep timer + normalize row */}
               <div className="mt-4 flex w-full items-center justify-center gap-3 text-[11px]">
                 <IconClock size={13} className="text-muted/70" />
-                {sleepMins ? (
+                {sleepDockRemaining !== null ? (
                   <>
                     <span className="tabular-nums text-muted">
-                      {fmt(sleepLeft)} left
+                      {fmt(sleepDockRemaining)} left
                     </span>
                     <button
                       type="button"
-                      className="rounded-full bg-white/10 px-2.5 py-0.5 text-ink hover:bg-white/15"
+                      className="rounded-lg bg-white/10 px-2.5 py-0.5 text-ink hover:bg-white/15"
                       onClick={cancelSleep}
                     >
                       Cancel
@@ -749,7 +954,7 @@ export function MiniPlayer() {
                       <button
                         key={m}
                         type="button"
-                        className="rounded-full bg-white/8 px-2.5 py-0.5 text-muted hover:bg-white/15 hover:text-ink"
+                        className="rounded-lg bg-white/10 px-2.5 py-0.5 text-muted hover:bg-white/15 hover:text-ink"
                         onClick={() => startSleep(m)}
                       >
                         {m}m
@@ -760,7 +965,7 @@ export function MiniPlayer() {
                 <div className="ml-2 h-3 w-px bg-white/15" />
                 <button
                   type="button"
-                  className={`rounded-full px-2.5 py-0.5 transition-colors ${
+                  className={`rounded-lg px-2.5 py-0.5 transition-colors ${
                     normalize
                       ? "bg-accent/25 text-accent-bright"
                       : "bg-white/8 text-muted hover:bg-white/15 hover:text-ink"
@@ -777,7 +982,7 @@ export function MiniPlayer() {
                   <button
                     key={id}
                     type="button"
-                    className={`flex-1 rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider ${
+                    className={`flex-1 rounded-lg px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider ${
                       panel === id ? "bg-white/15 text-ink" : "text-muted"
                     }`}
                     onClick={() => setPanel(id)}
@@ -806,6 +1011,21 @@ export function MiniPlayer() {
                           .catch(() => setLyricsError("No lyrics found"));
                       }}
                     />
+                  </div>
+                )}
+                {panel === "similar" && (
+                  <div className="mb-3 px-2">
+                    <button
+                      type="button"
+                      className="btn btn-secondary w-full text-xs"
+                      onClick={() => {
+                        void api.generateRadio(current.id).then((tracks) => {
+                          if (tracks.length) usePlayer.getState().playNow([current, ...tracks], 0);
+                        }).catch(() => undefined);
+                      }}
+                    >
+                      Start song radio
+                    </button>
                   </div>
                 )}
                 {panel === "similar" &&
@@ -864,7 +1084,7 @@ export function MiniPlayer() {
                         <div className="text-xs tabular-nums text-muted">{fmt(track.duration)}</div>
                         <button
                           type="button"
-                          className="btn-icon !h-6 !w-6 shrink-0 hover:text-rose-400"
+                          className="btn-icon !h-6 !w-6 shrink-0 hover:text-danger"
                           title="Remove from queue"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -888,7 +1108,7 @@ export function MiniPlayer() {
                   <button
                     key={id}
                     type="button"
-                    className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+                    className={`rounded-lg px-3 py-1 text-[10px] font-semibold uppercase tracking-wider ${
                       panel === id ? "bg-white/12 text-ink" : "text-muted hover:text-ink"
                     }`}
                     onClick={() => setPanel(id)}
@@ -918,6 +1138,21 @@ export function MiniPlayer() {
                         .catch(() => setLyricsError("No lyrics found"));
                     }}
                   />
+                </div>
+              )}
+              {panel === "similar" && (
+                <div className="mb-3 px-2">
+                  <button
+                    type="button"
+                    className="btn btn-secondary w-full text-xs"
+                    onClick={() => {
+                      void api.generateRadio(current.id).then((tracks) => {
+                        if (tracks.length) usePlayer.getState().playNow([current, ...tracks], 0);
+                      }).catch(() => undefined);
+                    }}
+                  >
+                    Start song radio
+                  </button>
                 </div>
               )}
               {panel === "similar" &&
@@ -984,7 +1219,7 @@ export function MiniPlayer() {
                       <div className="text-xs tabular-nums text-muted">{fmt(track.duration)}</div>
                       <button
                         type="button"
-                        className="btn-icon !h-6 !w-6 shrink-0 hover:text-rose-400"
+                        className="btn-icon !h-6 !w-6 shrink-0 hover:text-danger"
                         title="Remove from queue"
                         onClick={(e) => {
                           e.stopPropagation();

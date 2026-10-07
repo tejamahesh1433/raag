@@ -216,7 +216,7 @@ export function ChatPage() {
         ))}
 
         {error && (
-          <div className="mx-auto max-w-lg rounded-lg bg-rose-950 px-3 py-2 text-center text-xs text-rose-300">
+          <div className="mx-auto max-w-lg rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-center text-xs text-danger">
             {error}
           </div>
         )}

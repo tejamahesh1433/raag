@@ -73,12 +73,10 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="login-shell">
-      <div className="relative z-10 w-full max-w-lg rounded-3xl border border-border bg-panel/90 p-8 shadow-2xl backdrop-blur-xl">
+      <div className="relative z-10 m-auto w-full max-w-lg border border-border bg-panel px-7 py-9 sm:px-9">
         <div className="mb-2 flex items-center gap-3">
           <BrandLogo size={40} />
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-bright">
-            Setup
-          </span>
+          <span className="eyebrow !mb-0">Setup</span>
         </div>
         <h1 className="font-display text-3xl text-ink">Welcome to {APP_NAME}</h1>
         <p className="mt-2 text-sm text-muted">
@@ -89,15 +87,15 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
           {STEPS.map((s, i) => (
             <div
               key={s}
-              className={`h-1 flex-1 rounded-full ${
-                STEPS.indexOf(step) >= i ? "bg-accent" : "bg-white/10"
+              className={`h-1 flex-1 rounded-sm ${
+                STEPS.indexOf(step) >= i ? "bg-accent" : "bg-ink/10"
               }`}
             />
           ))}
         </div>
 
         {error && (
-          <div className="mb-4 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-sm text-accent-bright">
+          <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
             {error}
           </div>
         )}
@@ -169,7 +167,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               <div className="flex items-center gap-2">
                 <span
                   className={`h-2 w-2 rounded-full ${
-                    status?.ai_reachable ? "bg-emerald-400" : "bg-rose-400"
+                    status?.ai_reachable ? "bg-emerald-400" : "bg-danger"
                   }`}
                 />
                 {status?.ai_reachable ? "AI provider reachable" : "AI offline — app still works"}

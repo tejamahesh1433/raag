@@ -23,6 +23,12 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CreateUserIn(BaseModel):
+    username: str
+    password: str
+    is_admin: bool = False
+
+
 class SessionOut(BaseModel):
     token: str
     created_at: datetime

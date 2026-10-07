@@ -187,3 +187,24 @@ export function IconSpark({ className, size = 20 }: IconProps) {
     </svg>
   );
 }
+
+export function IconQueue({ className, size = 20 }: IconProps) {
+  const p = base(className, size);
+  return (
+    <svg viewBox="0 0 24 24" {...p}>
+      <path d="M3 7h12M3 12h12M3 17h12" />
+      <path d="M17 8l6 4-6 4V8z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function IconChart({ className, size = 20 }: IconProps) {
+  const p = base(className, size);
+  return (
+    <svg viewBox="0 0 24 24" {...p} fill="currentColor" stroke="none">
+      <rect x="3" y="14" width="4" height="7" rx="1" />
+      <rect x="10" y="9" width="4" height="12" rx="1" />
+      <rect x="17" y="4" width="4" height="17" rx="1" />
+    </svg>
+  );
+}

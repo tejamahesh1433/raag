@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session as DbSession
 from .. import config
 from ..deps import SESSION_COOKIE, get_current_user, get_db
 from ..models import Session as SessionModel, User
-from ..schemas import LoginIn, MessageOut, SessionOut, SetupIn, UserOut
+from ..schemas import CreateUserIn, LoginIn, MessageOut, SessionOut, SetupIn, UserOut
 from ..security import hash_password, new_session_token, rate_limiter, session_expiry, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -99,6 +99,52 @@ def list_sessions(db: DbSession = Depends(get_db), user: User = Depends(get_curr
     return [
         SessionOut(token=r.token, created_at=r.created_at, expires_at=r.expires_at) for r in rows
     ]
+
+
+@router.get("/users", response_model=list[UserOut])
+def list_users(db: DbSession = Depends(get_db), user: User = Depends(get_current_user)):
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only")
+    return db.query(User).order_by(User.id).all()
+
+
+@router.post("/users", response_model=UserOut, status_code=201)
+def create_user(
+    payload: CreateUserIn,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only")
+    if db.query(User).filter(User.username == payload.username.strip()).first():
+        raise HTTPException(status_code=409, detail="Username already taken")
+    new_user = User(
+        username=payload.username.strip(),
+        password_hash=hash_password(payload.password),
+        is_admin=payload.is_admin,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+
+@router.delete("/users/{user_id}", response_model=MessageOut)
+def delete_user(
+    user_id: int,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only")
+    if user_id == user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    target = db.query(User).filter(User.id == user_id).first()
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(target)
+    db.commit()
+    return MessageOut(message="user deleted")
 
 
 @router.delete("/sessions/{token}", response_model=MessageOut)

@@ -106,7 +106,7 @@ export function TrackList({
             >
               <button
                 type="button"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs tabular-nums text-muted transition-colors hover:bg-white/10 hover:text-ink"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs tabular-nums text-muted transition-colors hover:bg-ink/8 hover:text-ink"
                 onClick={() => usePlayer.getState().playNow(tracks, i)}
                 title="Play"
               >
@@ -173,7 +173,7 @@ export function TrackList({
                 {onRemove && (
                   <button
                     type="button"
-                    className="btn-icon !h-9 !w-9 hover:text-rose-400"
+                    className="btn-icon !h-9 !w-9 hover:text-danger"
                     onClick={() => onRemove(track.id)}
                     title="Remove from playlist"
                   >
@@ -199,7 +199,7 @@ export function TrackList({
                         <button
                           key={pl.id}
                           type="button"
-                          className="flex w-full items-center gap-2 truncate rounded-xl px-2 py-2 text-left text-xs hover:bg-white/8"
+                          className="flex w-full items-center gap-2 truncate rounded-xl px-2 py-2 text-left text-xs hover:bg-ink/6"
                           onClick={async () => {
                             await api.addToPlaylist(pl.id, [track.id]);
                             setMenuFor(null);

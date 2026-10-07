@@ -30,6 +30,7 @@ let _currentPreset: EqPreset = "flat";
 let _customGains: number[] = [0, 0, 0, 0, 0];
 let _preloadedUrl: string | null = null;
 let _switching = false;
+let _merge: GainNode | null = null;
 
 function _makeAudio(): HTMLAudioElement {
   const el = new Audio();
@@ -84,11 +85,23 @@ export function pauseAudio(): void {
   }
 }
 
+function _onAirPlayTargetChanged(): void {
+  if (_ctx?.state === "suspended") void _ctx.resume().catch(() => undefined);
+  _reconnectGraph();
+  window.dispatchEvent(new CustomEvent("raag:airplay-target-changed"));
+}
+
 function _initAudioGraph(): void {
   _ensureElements();
   if (_srcA && _srcB) return;
   try {
     _ctx = new AudioContext();
+
+    // Auto-resume whenever the context is suspended (e.g. AirPlay device switch).
+    _ctx.addEventListener("statechange", () => {
+      if (_ctx?.state === "suspended") void _ctx.resume().catch(() => undefined);
+    });
+
     _srcA = _ctx.createMediaElementSource(_a!);
     _srcB = _ctx.createMediaElementSource(_b!);
     _gainA = _ctx.createGain();
@@ -116,6 +129,10 @@ function _initAudioGraph(): void {
     _analyser.fftSize = 256;
     _analyser.smoothingTimeConstant = 0.8;
 
+    // Listen for AirPlay target changes on both buffers.
+    _a!.addEventListener("webkitcurrentplaybacktargetisawirelessdevicechanged", _onAirPlayTargetChanged);
+    _b!.addEventListener("webkitcurrentplaybacktargetisawirelessdevicechanged", _onAirPlayTargetChanged);
+
     _reconnectGraph();
   } catch {
     _ctx = _srcA = _srcB = _gainA = _gainB = _comp = _analyser = null;
@@ -130,6 +147,7 @@ function _reconnectGraph(): void {
     _srcB.disconnect();
     _gainA.disconnect();
     _gainB.disconnect();
+    _merge?.disconnect();
     _comp?.disconnect();
     _analyser?.disconnect();
     _eqBands.forEach((b) => b.disconnect());
@@ -137,12 +155,14 @@ function _reconnectGraph(): void {
     _srcA.connect(_gainA);
     _srcB.connect(_gainB);
 
-    const merge = _ctx.createGain();
-    merge.gain.value = 1;
-    _gainA.connect(merge);
-    _gainB.connect(merge);
+    if (!_merge) {
+      _merge = _ctx.createGain();
+      _merge.gain.value = 1;
+    }
+    _gainA.connect(_merge);
+    _gainB.connect(_merge);
 
-    let lastNode: AudioNode = merge;
+    let lastNode: AudioNode = _merge;
     for (const filter of _eqBands) {
       lastNode.connect(filter);
       lastNode = filter;
@@ -358,6 +378,10 @@ export function airPlayAvailable(): boolean {
   return typeof el.webkitShowPlaybackTargetPicker === "function";
 }
 
+export function resumeAudioContext(): void {
+  if (_ctx?.state === "suspended") void _ctx.resume().catch(() => undefined);
+}
+
 /** Attach the same listener to both buffers (active swaps during gapless). */
 export function addAudioListener(
   type: string,
@@ -370,4 +394,39 @@ export function addAudioListener(
     _a?.removeEventListener(type, fn);
     _b?.removeEventListener(type, fn);
   };
+}
+
+// --- Sleep timer ---
+
+let _sleepTimerId: ReturnType<typeof setTimeout> | null = null;
+let _sleepTimerEnd: number | null = null;  // epoch ms when timer fires
+
+export function setSleepTimer(minutes: number): void {
+  clearSleepTimer();
+  if (minutes <= 0) return;
+  const ms = minutes * 60 * 1000;
+  _sleepTimerEnd = Date.now() + ms;
+  _sleepTimerId = setTimeout(() => {
+    pauseAudio();
+    // Dispatch a custom event so the player store / UI can react
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("raag:sleep-timer-fired"));
+    }
+    _sleepTimerId = null;
+    _sleepTimerEnd = null;
+  }, ms);
+}
+
+export function clearSleepTimer(): void {
+  if (_sleepTimerId !== null) {
+    clearTimeout(_sleepTimerId);
+    _sleepTimerId = null;
+  }
+  _sleepTimerEnd = null;
+}
+
+export function getSleepTimerRemaining(): number | null {
+  if (_sleepTimerEnd === null) return null;
+  const remaining = Math.max(0, Math.ceil((_sleepTimerEnd - Date.now()) / 1000));
+  return remaining;
 }

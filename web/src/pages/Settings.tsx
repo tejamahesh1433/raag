@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { Card, PageHeader } from "../components/ui";
-import type { Job, Settings } from "../types";
+import type { Job, Settings, User } from "../types";
 import { useAuth } from "../store/auth";
 import {
   getCrossfade,
@@ -49,9 +49,14 @@ export function SettingsPage() {
     model: string;
     ready: boolean;
   } | null>(null);
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof api.listeningStats>> | null>(null);
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof api.healthDetail>> | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newIsAdmin, setNewIsAdmin] = useState(false);
 
 
   const load = async () => {
@@ -84,8 +89,19 @@ export function SettingsPage() {
       } catch {
         setEmbedStatus(null);
       }
+      try {
+        setStats(await api.listeningStats());
+      } catch {
+        setStats(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load settings");
+    }
+  };
+
+  const loadUsers = () => {
+    if (user?.is_admin) {
+      void api.listUsers().then(setUsers).catch(() => setUsers([]));
     }
   };
 
@@ -93,6 +109,11 @@ export function SettingsPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.is_admin]);
 
   const flash = (msg: string) => {
     setMessage(msg);
@@ -198,7 +219,7 @@ export function SettingsPage() {
         </div>
       )}
       {error && (
-        <div className="rounded-lg bg-rose-950 px-3 py-2 text-sm text-rose-300">{error}</div>
+        <div className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</div>
       )}
 
       <Card>
@@ -252,6 +273,92 @@ export function SettingsPage() {
           </div>
         )}
       </Card>
+
+      {user?.is_admin && (
+        <Card>
+          <h2 className="mb-1 text-sm font-semibold text-ink">Users</h2>
+          <p className="mb-3 text-xs text-muted">Manage accounts that can log in to this server.</p>
+          <div className="mb-3 space-y-2">
+            {users.map((u) => (
+              <div
+                key={u.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border-subtle px-3 py-2 text-xs"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="truncate text-ink">{u.username}</span>
+                  {u.is_admin && (
+                    <span className="rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                      Admin
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost !py-1 !text-xs"
+                  disabled={u.id === user.id}
+                  onClick={() =>
+                    void api
+                      .deleteUser(u.id)
+                      .then(() => {
+                        flash(`Deleted ${u.username}`);
+                        loadUsers();
+                      })
+                      .catch((err) =>
+                        setError(err instanceof Error ? err.message : "Delete failed"),
+                      )
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input
+              className="input"
+              placeholder="Username"
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
+            />
+            <input
+              className="input"
+              placeholder="Password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+          <label className="mt-2 flex items-center gap-2 text-xs text-muted">
+            <input
+              type="checkbox"
+              checked={newIsAdmin}
+              onChange={(e) => setNewIsAdmin(e.target.checked)}
+            />
+            Admin?
+          </label>
+          <button
+            type="button"
+            className="btn btn-primary mt-3"
+            onClick={() => {
+              if (!newUsername.trim() || !newPassword) return;
+              void api
+                .createUser({ username: newUsername.trim(), password: newPassword, is_admin: newIsAdmin })
+                .then(() => {
+                  flash(`Created ${newUsername.trim()}`);
+                  setNewUsername("");
+                  setNewPassword("");
+                  setNewIsAdmin(false);
+                  loadUsers();
+                })
+                .catch((err) =>
+                  setError(err instanceof Error ? err.message : "Create failed"),
+                );
+            }}
+          >
+            Add user
+          </button>
+        </Card>
+      )}
 
       <Card>
         <h2 className="mb-1 text-sm font-semibold text-ink">Scheduled rescan</h2>
@@ -676,13 +783,31 @@ export function SettingsPage() {
             {embedJob.total > 0 ? ` (${embedJob.progress}/${embedJob.total})` : ""}
           </div>
         )}
+        {stats && (
+          <div className="mt-3 rounded-lg bg-panel-2 p-3 text-xs text-muted">
+            <div>
+              Library: {stats.total_tracks} tracks ·{" "}
+              {Math.round(stats.total_duration_seconds / 3600)}h
+            </div>
+            {stats.top_artists[0] && (
+              <div className="mt-1">
+                Top artist: {stats.top_artists[0].artist} ({stats.top_artists[0].count})
+              </div>
+            )}
+            {stats.top_genres[0] && (
+              <div className="mt-1">
+                Top genre: {stats.top_genres[0].genre} ({stats.top_genres[0].count})
+              </div>
+            )}
+          </div>
+        )}
 
         {detail && (
           <div className="mt-3 rounded-lg bg-panel-2 p-3 text-xs">
             <div className="flex items-center gap-2">
               <span
                 className={`h-2 w-2 rounded-full ${
-                  detail.ai.reachable ? "bg-emerald-400" : "bg-rose-400"
+                  detail.ai.reachable ? "bg-emerald-400" : "bg-danger"
                 }`}
               />
               {detail.ai.reachable ? (

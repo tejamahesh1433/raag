@@ -17,7 +17,6 @@ export function LibraryPage() {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [genres, setGenres] = useState<{ genre: string; count: number }[]>([]);
   const [folders, setFolders] = useState<{ folder: string; count: number }[]>([]);
-  const [genreFilter, setGenreFilter] = useState<string | null>(null);
   const [yearFilter, setYearFilter] = useState<number | null>(null);
   const [folderFilter, setFolderFilter] = useState<string | null>(null);
   const [folderTracks, setFolderTracks] = useState<Track[]>([]);
@@ -81,14 +80,6 @@ export function LibraryPage() {
   }, [tab]);
 
   useEffect(() => {
-    if (!genreFilter) return;
-    void api
-      .tracks({ limit: 500, order: "artist", genre: genreFilter })
-      .then((page) => setTracks(page.items))
-      .catch(() => undefined);
-  }, [genreFilter]);
-
-  useEffect(() => {
     if (folderFilter == null) {
       setFolderTracks([]);
       return;
@@ -123,7 +114,6 @@ export function LibraryPage() {
     playable.length > 0 &&
     (tab === "tracks" ||
       tab === "recent" ||
-      (tab === "genres" && genreFilter != null) ||
       (tab === "folders" && folderFilter != null));
 
   return (
@@ -131,9 +121,7 @@ export function LibraryPage() {
       <PageHeader
         title="Library"
         subtitle={
-          genreFilter
-            ? `Genre · ${genreFilter}`
-            : folderFilter != null
+          folderFilter != null
               ? `Folder · ${folderFilter === "." ? "(library root)" : folderFilter}`
               : yearFilter != null
                 ? `Year · ${yearFilter}`
@@ -172,12 +160,9 @@ export function LibraryPage() {
         <SegmentedControl
           value={tab}
           onChange={(next) => {
-            const leavingGenres = tab === "genres" && next !== "genres";
             setTab(next);
-            if (next !== "genres") setGenreFilter(null);
             if (next !== "years") setYearFilter(null);
             if (next !== "folders") setFolderFilter(null);
-            if (leavingGenres) void load();
           }}
           options={tabs}
         />
@@ -185,7 +170,7 @@ export function LibraryPage() {
 
       {loading && <div className="px-8 py-12 text-sm text-muted">Loading your library…</div>}
       {error && (
-        <div className="mx-8 rounded-xl border border-rose-900/40 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">
+        <div className="mx-8 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
         </div>
       )}
@@ -223,37 +208,21 @@ export function LibraryPage() {
 
       {!loading && !error && tab === "genres" && (
         <div className="space-y-4 px-5 pb-8 sm:px-8">
-          {genreFilter ? (
-            <button
-              type="button"
-              className="btn btn-ghost !text-xs"
-              onClick={() => {
-                setGenreFilter(null);
-                void load();
-              }}
-            >
-              ← All genres
-            </button>
-          ) : null}
-          {!genreFilter && (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {genres.map((g) => (
-                <button
-                  key={g.genre}
-                  type="button"
-                  className="flex items-center justify-between rounded-2xl border border-border-subtle bg-panel/40 px-4 py-3 text-left transition-colors hover:bg-panel/70"
-                  onClick={() => setGenreFilter(g.genre)}
-                >
-                  <span className="truncate font-medium text-ink">{g.genre}</span>
-                  <span className="text-xs text-muted">{g.count}</span>
-                </button>
-              ))}
-              {genres.length === 0 && (
-                <EmptyState>No genre tags found in your library yet.</EmptyState>
-              )}
-            </div>
-          )}
-          {genreFilter && <TrackList tracks={tracks} artworkByAlbumId={artworkByAlbumId} />}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {genres.map((g) => (
+              <Link
+                key={g.genre}
+                to={`/genres/${encodeURIComponent(g.genre)}`}
+                className="flex items-center justify-between rounded-2xl border border-border-subtle bg-panel/40 px-4 py-3 text-left transition-colors hover:bg-panel/70"
+              >
+                <span className="truncate font-medium text-ink">{g.genre}</span>
+                <span className="text-xs text-muted">{g.count}</span>
+              </Link>
+            ))}
+            {genres.length === 0 && (
+              <EmptyState>No genre tags found in your library yet.</EmptyState>
+            )}
+          </div>
         </div>
       )}
 

@@ -14,7 +14,8 @@ services:
       MUSIC_ADMIN_USER: "${MUSIC_ADMIN_USER:-}"
       MUSIC_ADMIN_PASSWORD: "${MUSIC_ADMIN_PASSWORD:-}"
       # Optional: seed library folders at first boot (also settable in the UI)
-      MUSIC_LIBRARY_ROOTS: '${MUSIC_LIBRARY_ROOTS:-}'
+      MUSIC_LIBRARY_ROOTS: '${MUSIC_LIBRARY_ROOTS:-["/music"]}'
+      MUSIC_AUTH_REQUIRED: "${MUSIC_AUTH_REQUIRED:-0}"
     volumes:
       - music-data:/data
       # >>> EDIT THIS: your music folder on the host <<<

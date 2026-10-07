@@ -34,8 +34,8 @@ export function SpectrumVisualizer({ active }: { active: boolean }) {
         const x = i * (barW + gap);
         const y = height - h;
         const grad = ctx.createLinearGradient(0, height, 0, 0);
-        grad.addColorStop(0, "rgba(251,113,133,0.35)");
-        grad.addColorStop(1, "rgba(255,255,255,0.85)");
+        grad.addColorStop(0, "rgba(184,121,20,0.4)");
+        grad.addColorStop(1, "rgba(224,168,46,0.9)");
         ctx.fillStyle = grad;
         ctx.fillRect(x, y, barW, h);
       }

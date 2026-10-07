@@ -1,45 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Raag">
   <defs>
-    <linearGradient id="raag-fire" x1="24" y1="20" x2="104" y2="112" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#fdba74"/>
-      <stop offset="0.45" stop-color="#fb7185"/>
-      <stop offset="1" stop-color="#e11d48"/>
-    </linearGradient>
-    <linearGradient id="raag-gold" x1="40" y1="36" x2="88" y2="96" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#fde68a"/>
-      <stop offset="1" stop-color="#f59e0b"/>
+    <linearGradient id="raag-saffron" x1="24" y1="20" x2="104" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e0a82e"/>
+      <stop offset="0.55" stop-color="#b87914"/>
+      <stop offset="1" stop-color="#8a5c10"/>
     </linearGradient>
   </defs>
-  <!-- App tile -->
-  <rect width="128" height="128" rx="30" fill="#141018"/>
-  <!-- Soft glow -->
-  <circle cx="64" cy="64" r="48" fill="#fb7185" opacity="0.1"/>
-  <!-- Outer raag ring -->
-  <circle cx="64" cy="64" r="40" fill="none" stroke="url(#raag-fire)" stroke-width="3.5" opacity="0.85"/>
-  <!-- Ascending swara arcs (sa–re–ga contour) -->
+  <rect width="128" height="128" rx="28" fill="#14241c"/>
+  <circle cx="64" cy="64" r="42" fill="none" stroke="url(#raag-saffron)" stroke-width="3"/>
   <path
-    d="M36 78c8-18 20-30 28-34"
+    d="M38 76c10-20 22-32 30-36"
     fill="none"
-    stroke="url(#raag-gold)"
+    stroke="#e0a82e"
     stroke-width="5"
     stroke-linecap="round"
   />
   <path
-    d="M48 86c10-22 24-36 34-40"
+    d="M50 86c12-24 26-38 36-42"
     fill="none"
-    stroke="url(#raag-fire)"
+    stroke="url(#raag-saffron)"
     stroke-width="5"
     stroke-linecap="round"
   />
   <path
-    d="M60 92c12-24 26-40 36-44"
+    d="M62 94c12-24 26-40 34-44"
     fill="none"
-    stroke="#fda4af"
-    stroke-width="5"
+    stroke="#d7e2db"
+    stroke-width="4.5"
     stroke-linecap="round"
-    opacity="0.9"
+    opacity="0.85"
   />
-  <!-- Center bindi / drone tone -->
-  <circle cx="64" cy="64" r="9" fill="url(#raag-gold)"/>
-  <circle cx="64" cy="64" r="3.5" fill="#141018"/>
+  <circle cx="64" cy="64" r="8" fill="#e0a82e"/>
+  <circle cx="64" cy="64" r="3" fill="#14241c"/>
 </svg>

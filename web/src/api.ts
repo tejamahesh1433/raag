@@ -76,6 +76,11 @@ export const api = {
     }),
   logout: () => request<{ message: string }>("/api/auth/logout", { method: "POST" }),
   me: () => request<User>("/api/auth/me"),
+  listUsers: () => request<User[]>("/api/auth/users"),
+  createUser: (payload: { username: string; password: string; is_admin?: boolean }) =>
+    request<User>("/api/auth/users", { method: "POST", body: JSON.stringify(payload) }),
+  deleteUser: (id: number) =>
+    request<{ message: string }>(`/api/auth/users/${id}`, { method: "DELETE" }),
 
 
   // library

@@ -9,6 +9,9 @@ import { LibraryPage } from "./pages/Library";
 import { LoginPage } from "./pages/Login";
 import { RemotePage } from "./pages/Remote";
 import { OrganizePage } from "./pages/Organize";
+import { QueuePage } from "./pages/Queue";
+import { StatsPage } from "./pages/Stats";
+import { GenrePage } from "./pages/Genre";
 import { PlaylistDetailPage } from "./pages/PlaylistDetail";
 import { PlaylistsPage } from "./pages/Playlists";
 import { SearchPage } from "./pages/Search";
@@ -80,6 +83,9 @@ export default function App() {
         <Route path="/playlists/:id" element={<PlaylistDetailPage />} />
         <Route path="/organize" element={<OrganizePage />} />
         <Route path="/remote" element={<RemotePage />} />
+        <Route path="/queue" element={<QueuePage />} />
+        <Route path="/stats" element={<StatsPage />} />
+        <Route path="/genres/:name" element={<GenrePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/library" replace />} />
       </Route>

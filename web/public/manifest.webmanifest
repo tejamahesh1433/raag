@@ -4,8 +4,8 @@
   "description": "Your local music library — private streaming with optional local AI.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a1622",
-  "theme_color": "#1a1622",
+  "background_color": "#d7e2db",
+  "theme_color": "#d7e2db",
   "icons": [
     {
       "src": "/icon.svg",
