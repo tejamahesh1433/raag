@@ -32,7 +32,7 @@ function formatRule(rule: Rule): string {
   const op = OP_LABELS[rule.op] ?? rule.op;
   const val =
     rule.field === "is_favorite"
-      ? rule.value === "true" || rule.value === true
+      ? rule.value === "true" || rule.value === 1
         ? "yes"
         : "no"
       : String(rule.value);
