@@ -62,8 +62,26 @@ def list_suggestions(
     if status != "all":
         q = q.filter(TagSuggestion.status == status)
     rows = q.limit(limit).all()
+    # Bulk-load tracks to avoid one db.get() per suggestion row.
+    track_ids = list({r.track_id for r in rows})
+    tracks_by_id = {
+        t.id: t for t in db.query(Track).filter(Track.id.in_(track_ids)).all()
+    }
     favs = _favorite_ids(db, user)
-    return [_suggestion_out(db, r, favs) for r in rows]
+    result = []
+    for r in rows:
+        track = tracks_by_id.get(r.track_id)
+        result.append(SuggestionOut(
+            id=r.id,
+            track_id=r.track_id,
+            status=r.status,
+            proposed=json.loads(r.proposed or "{}"),
+            original=json.loads(r.original or "{}"),
+            rationale=r.rationale or "",
+            created_at=r.created_at,
+            track=track_out(track, favs) if track else None,
+        ))
+    return result
 
 
 @router.post("/scan-tags", status_code=202)

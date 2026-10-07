@@ -73,7 +73,41 @@ def list_playlists(
         .order_by(Playlist.updated_at.desc())
         .all()
     )
-    return [_playlist_out(db, p) for p in rows]
+    # Bulk-count manual playlist tracks in one query instead of one per playlist.
+    manual_ids = [p.id for p in rows if p.kind not in ("smart", "ai")]
+    count_map: dict[int, int] = {}
+    if manual_ids:
+        for pid, cnt in (
+            db.query(PlaylistTrack.playlist_id, func.count(PlaylistTrack.id))
+            .filter(PlaylistTrack.playlist_id.in_(manual_ids))
+            .group_by(PlaylistTrack.playlist_id)
+            .all()
+        ):
+            count_map[pid] = cnt
+    result = []
+    for p in rows:
+        if p.kind in ("smart", "ai") and p.rules:
+            track_count = len(smart_playlist_tracks(db, p))
+        else:
+            track_count = count_map.get(p.id, 0)
+        rules = None
+        if p.rules:
+            try:
+                rules = json.loads(p.rules)
+            except json.JSONDecodeError:
+                pass
+        result.append(PlaylistOut(
+            id=p.id,
+            name=p.name,
+            description=p.description or "",
+            kind=p.kind,
+            rules=rules,
+            owner_id=p.owner_id,
+            track_count=track_count,
+            created_at=p.created_at,
+            updated_at=p.updated_at,
+        ))
+    return result
 
 
 @router.post("", response_model=PlaylistOut, status_code=201)
@@ -261,16 +295,23 @@ def add_tracks(
         or -1
     )
     position = payload.position if payload.position is not None else existing + 1
-    for track_id in payload.track_ids:
-        track = db.query(Track).filter(Track.id == track_id).first()
-        if track is None:
-            raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
-        duplicate = (
-            db.query(PlaylistTrack)
-            .filter(PlaylistTrack.playlist_id == playlist.id, PlaylistTrack.track_id == track_id)
-            .first()
+    # Bulk-load tracks and existing playlist entries to avoid per-track queries.
+    valid_track_ids = {
+        t.id for t in db.query(Track.id).filter(Track.id.in_(payload.track_ids)).all()
+    }
+    already_in = {
+        r.track_id
+        for r in db.query(PlaylistTrack.track_id)
+        .filter(
+            PlaylistTrack.playlist_id == playlist.id,
+            PlaylistTrack.track_id.in_(payload.track_ids),
         )
-        if duplicate is None:
+        .all()
+    }
+    for track_id in payload.track_ids:
+        if track_id not in valid_track_ids:
+            raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
+        if track_id not in already_in:
             db.add(PlaylistTrack(playlist_id=playlist.id, track_id=track_id, position=position))
             position += 1
     db.commit()

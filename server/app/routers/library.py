@@ -80,6 +80,40 @@ def album_out(db: DbSession, album: Album) -> AlbumOut:
     )
 
 
+def _albums_out_bulk(db: DbSession, albums: list[Album]) -> list[AlbumOut]:
+    """Serialize a list of albums with 2 queries total instead of 2 per album."""
+    if not albums:
+        return []
+    artist_ids = {a.artist_id for a in albums if a.artist_id is not None}
+    artists_by_id: dict[int, str] = {}
+    if artist_ids:
+        for row in db.query(Artist.id, Artist.name).filter(Artist.id.in_(artist_ids)).all():
+            artists_by_id[row[0]] = row[1]
+    album_ids = [a.id for a in albums]
+    stats_map: dict[int, tuple[int, int]] = {}
+    for aid, tc, dur in (
+        db.query(Track.album_id, func.count(Track.id), func.coalesce(func.sum(Track.duration), 0))
+        .filter(Track.album_id.in_(album_ids))
+        .group_by(Track.album_id)
+        .all()
+    ):
+        stats_map[aid] = (tc, dur)
+    result = []
+    for a in albums:
+        tc, dur = stats_map.get(a.id, (0, 0))
+        result.append(AlbumOut(
+            id=a.id,
+            title=a.title,
+            artist=artists_by_id.get(a.artist_id, "Unknown Artist"),
+            artist_id=a.artist_id,
+            year=a.year,
+            track_count=tc,
+            duration=dur,
+            artwork_id=a.artwork_id,
+        ))
+    return result
+
+
 def artist_out(db: DbSession, artist: Artist) -> ArtistOut:
     track_count = db.query(func.count(Track.id)).filter(Track.artist_id == artist.id).scalar() or 0
     album_count = (
@@ -89,6 +123,30 @@ def artist_out(db: DbSession, artist: Artist) -> ArtistOut:
         or 0
     )
     return ArtistOut(id=artist.id, name=artist.name, track_count=track_count, album_count=album_count)
+
+
+def _artists_out_bulk(db: DbSession, artists: list[Artist]) -> list[ArtistOut]:
+    """Serialize a list of artists with 1 query total instead of 2 per artist."""
+    if not artists:
+        return []
+    artist_ids = [a.id for a in artists]
+    stats_map: dict[int, tuple[int, int]] = {}
+    for aid, tc, ac in (
+        db.query(
+            Track.artist_id,
+            func.count(Track.id),
+            func.count(func.distinct(Track.album_id)),
+        )
+        .filter(Track.artist_id.in_(artist_ids))
+        .group_by(Track.artist_id)
+        .all()
+    ):
+        stats_map[aid] = (tc, ac)
+    result = []
+    for a in artists:
+        tc, ac = stats_map.get(a.id, (0, 0))
+        result.append(ArtistOut(id=a.id, name=a.name, track_count=tc, album_count=ac))
+    return result
 
 
 # Scan ----------------------------------------------------------------------
@@ -200,7 +258,7 @@ def list_artists(
     user: User = Depends(get_current_user),
 ):
     rows = db.query(Artist).order_by(Artist.name.asc()).offset(offset).limit(limit).all()
-    return [artist_out(db, a) for a in rows]
+    return _artists_out_bulk(db, rows)
 
 
 @router.get("/library/artists/{artist_id}", response_model=ArtistOut)
@@ -227,7 +285,7 @@ def list_albums(
     if artist_id is not None:
         query = query.filter(Album.artist_id == artist_id)
     rows = query.order_by(Album.title.asc()).offset(offset).limit(limit).all()
-    return [album_out(db, a) for a in rows]
+    return _albums_out_bulk(db, rows)
 
 
 @router.get("/library/albums/{album_id}", response_model=AlbumOut)
@@ -334,8 +392,8 @@ def search(
     )
     return SearchOut(
         tracks=[track_out(t, favs) for t in tracks],
-        artists=[artist_out(db, a) for a in artists],
-        albums=[album_out(db, a) for a in albums],
+        artists=_artists_out_bulk(db, artists),
+        albums=_albums_out_bulk(db, albums),
     )
 
 
@@ -485,12 +543,12 @@ def record_play(
         from ..services.scrobble import scrobble_track
         from ..services.discord_hook import notify_discord
 
-        cfg_row = db.query(Setting).filter(Setting.key == "scrobble").first()
-        cfg = json.loads(cfg_row.value) if cfg_row and cfg_row.value else {}
+        cfg_val = _cached_setting(db, "scrobble")
+        cfg = json.loads(cfg_val) if cfg_val else {}
         scrobble_track(track, cfg if isinstance(cfg, dict) else {})
 
-        discord_row = db.query(Setting).filter(Setting.key == "discord").first()
-        discord_cfg = json.loads(discord_row.value) if discord_row and discord_row.value else {}
+        discord_val = _cached_setting(db, "discord")
+        discord_cfg = json.loads(discord_val) if discord_val else {}
         notify_discord(track, discord_cfg if isinstance(discord_cfg, dict) else {})
     except Exception:
         pass

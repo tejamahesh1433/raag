@@ -40,18 +40,29 @@ def _upsert_setting(db: DbSession, key: str, value) -> None:
     setting.value = json.dumps(value)
 
 
+_SETTINGS_KEYS = {"library_roots", "ai", "scan_interval_hours", "transcode_enabled", "scrobble", "discord", "acoustid"}
+
+
 def _get_settings(db: DbSession) -> SettingsOut:
-    roots = _setting_json(db, "library_roots", [])
-    ai = _setting_json(db, "ai", {})
-    hours = _setting_json(db, "scan_interval_hours", 0)
+    # One query for all settings instead of 7 separate ones.
+    raw: dict[str, object] = {}
+    for row in db.query(Setting).filter(Setting.key.in_(_SETTINGS_KEYS)).all():
+        if row.value:
+            try:
+                raw[row.key] = json.loads(row.value)
+            except json.JSONDecodeError:
+                raw[row.key] = None
+    roots = raw.get("library_roots") or []
+    ai = raw.get("ai") or {}
+    hours = raw.get("scan_interval_hours") or 0
     try:
         hours = int(hours)
     except (TypeError, ValueError):
         hours = 0
-    transcode = bool(_setting_json(db, "transcode_enabled", False))
-    scrobble = _setting_json(db, "scrobble", {})
-    discord = _setting_json(db, "discord", {})
-    acoustid = _setting_json(db, "acoustid", {})
+    transcode = bool(raw.get("transcode_enabled") or False)
+    scrobble = raw.get("scrobble") or {}
+    discord = raw.get("discord") or {}
+    acoustid = raw.get("acoustid") or {}
     return SettingsOut(
         library_roots=roots if isinstance(roots, list) else [],
         ai=ai if isinstance(ai, dict) else {},

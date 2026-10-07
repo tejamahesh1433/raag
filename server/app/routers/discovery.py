@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -38,14 +39,24 @@ class LyricsOut(BaseModel):
     source: str = ""
 
 
+_AI_CFG_CACHE: tuple[dict, float] | None = None
+_AI_CFG_TTL = 60.0
+
+
 def _ai_cfg(db: DbSession) -> dict:
+    global _AI_CFG_CACHE
+    now = time.monotonic()
+    if _AI_CFG_CACHE is not None and (now - _AI_CFG_CACHE[1]) < _AI_CFG_TTL:
+        return _AI_CFG_CACHE[0]
     row = db.query(Setting).filter(Setting.key == "ai").first()
-    if not row or not row.value:
-        return {}
-    try:
-        return json.loads(row.value)
-    except json.JSONDecodeError:
-        return {}
+    value: dict = {}
+    if row and row.value:
+        try:
+            value = json.loads(row.value)
+        except json.JSONDecodeError:
+            pass
+    _AI_CFG_CACHE = (value, now)
+    return value
 
 
 def _embed_model(db: DbSession) -> str:
