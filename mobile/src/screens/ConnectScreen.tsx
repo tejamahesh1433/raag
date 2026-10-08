@@ -29,7 +29,7 @@ export function ConnectScreen() {
         style={s.input}
         value={url}
         onChangeText={setUrl}
-        placeholder="http://192.168.x.x:8765"
+        placeholder="https://music.tejainfo.xyz"
         placeholderTextColor={MUTED}
         autoCapitalize="none"
         autoCorrect={false}

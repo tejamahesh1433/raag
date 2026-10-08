@@ -10,7 +10,7 @@ const BASE_URL_KEY = "raag_base_url";
 const COOKIE_KEY = "raag_session_cookie";
 const QUALITY_KEY = "raag_stream_quality";
 
-export const DEFAULT_SERVER_URL = "http://192.168.4.43:8765";
+export const DEFAULT_SERVER_URL = "https://music.tejainfo.xyz";
 
 export type StreamQuality = "original" | "high" | "medium" | "low";
 
