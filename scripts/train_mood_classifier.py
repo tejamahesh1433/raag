@@ -107,17 +107,21 @@ def fetch_tracks(server: str) -> list[dict]:
 def track_text(t: dict) -> str:
     parts = [
         t.get("title") or "",
-        t.get("artist_name") or "",
-        t.get("album_title") or "",
+        t.get("artist") or t.get("artist_name") or "",
+        t.get("album") or t.get("album_title") or "",
         t.get("genre") or "",
     ]
     return " ".join(p for p in parts if p).strip()
 
 
 def build_labels(tracks: list[dict]) -> tuple[list[str], list[str], list[int]]:
-    """Return (texts, labels, track_ids)."""
+    """Return (texts, labels, track_ids).
+
+    Only keyword-matched songs are used for training.
+    Unlabeled songs still get embeddings and have their mood predicted by the model.
+    """
     texts, labels, ids = [], [], []
-    weak, weak_ids = [], []  # score-0 tracks need fallback
+    unlabeled_count = 0
 
     for t in tracks:
         txt = track_text(t)
@@ -127,12 +131,13 @@ def build_labels(tracks: list[dict]) -> tuple[list[str], list[str], list[int]]:
         if score > 0:
             labels.append(mood)
         else:
-            labels.append("romantic")  # default — most Telugu songs are romantic
-            weak.append(len(labels) - 1)
+            labels.append(None)  # not used for training
+            unlabeled_count += 1
 
-    dist = Counter(labels)
-    print(f"  Keyword-labeled: {len(labels) - len(weak)} strong, {len(weak)} defaulted")
-    print(f"  Distribution: {dict(dist)}")
+    labeled = [l for l in labels if l is not None]
+    dist = Counter(labeled)
+    print(f"  Keyword-labeled: {len(labeled)} strong, {unlabeled_count} unlabeled (model will predict)")
+    print(f"  Training distribution: {dict(dist)}")
     return texts, labels, ids
 
 
@@ -148,23 +153,29 @@ def embed(model: SentenceTransformer, texts: list[str], device: str) -> np.ndarr
 
 
 def train_classifier(
-    X: np.ndarray, labels: list[str]
+    X: np.ndarray, labels: list[str | None]
 ) -> tuple[LogisticRegression, LabelEncoder, float]:
+    # Only train on keyword-labeled tracks
+    mask = [i for i, l in enumerate(labels) if l is not None]
+    X_train = X[mask]
+    y_raw = [labels[i] for i in mask]
+
     le = LabelEncoder()
-    y = le.fit_transform(labels)
+    y = le.fit_transform(y_raw)
 
     clf = LogisticRegression(max_iter=1000, C=2.0, solver="lbfgs")
 
-    # Cross-validate on available data
-    n_splits = min(5, Counter(labels).most_common()[-1][1])  # at most as many folds as rarest class
+    n_splits = min(5, Counter(y_raw).most_common()[-1][1])
+    acc = 0.0
     if n_splits >= 2:
-        scores = cross_val_score(clf, X, y, cv=StratifiedKFold(n_splits=n_splits), scoring="accuracy")
-        print(f"  CV accuracy: {scores.mean():.2%} ± {scores.std():.2%}")
+        scores = cross_val_score(clf, X_train, y, cv=StratifiedKFold(n_splits=n_splits), scoring="accuracy")
+        acc = float(scores.mean())
+        print(f"  CV accuracy: {acc:.2%} +/- {scores.std():.2%}")
     else:
         print("  Too few samples per class for CV, training on full set")
 
-    clf.fit(X, y)
-    return clf, le, float(scores.mean()) if n_splits >= 2 else 0.0
+    clf.fit(X_train, y)
+    return clf, le, acc
 
 
 def predict_all(
@@ -173,6 +184,7 @@ def predict_all(
     X: np.ndarray,
     track_ids: list[int],
 ) -> dict[int, str]:
+    # Predict mood for every track (including previously unlabeled ones)
     preds = le.inverse_transform(clf.predict(X))
     return dict(zip(track_ids, preds))
 

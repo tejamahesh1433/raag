@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session as DbSession
 from ..models import Album, Artist, Playlist, PlaylistTrack, Track, User
 
 MAX_SEARCH_RESULTS = 25
+MAX_MOOD_RESULTS = 200  # mood searches return the full category
 
 # OpenAI tool schemas ---------------------------------------------------------
 TOOLS_SPEC: list[dict] = [
@@ -164,7 +165,7 @@ def execute_tool(
                 db.query(Track)
                 .filter(Track.mood == mood_hit)
                 .order_by(Track.play_count.desc(), Track.title.asc())
-                .limit(limit)
+                .limit(MAX_MOOD_RESULTS)
                 .all()
             )
             # Fall back to keyword search if mood column not yet populated
