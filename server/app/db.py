@@ -57,11 +57,29 @@ engine = _make_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
+def _migrate_chat_messages_device_id() -> None:
+    """Add device_id column to chat_messages if it doesn't exist (one-time migration)."""
+    with engine.begin() as conn:
+        try:
+            conn.exec_driver_sql(
+                "ALTER TABLE chat_messages ADD COLUMN device_id TEXT NOT NULL DEFAULT 'default'"
+            )
+        except Exception:
+            pass  # column already exists
+        try:
+            conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_chat_messages_device_id ON chat_messages (device_id)"
+            )
+        except Exception:
+            pass
+
+
 def init_db() -> None:
     """Create tables, FTS index and seed settings from the environment."""
     from . import models  # noqa: F401  (register mappings)
 
     metadata.create_all(engine)
+    _migrate_chat_messages_device_id()
     # Execute raw schema; statements are split with sqlite3.complete_statement
     # because CREATE TRIGGER bodies contain semicolons.
     statements, buf = [], ""

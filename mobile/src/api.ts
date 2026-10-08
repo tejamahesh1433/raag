@@ -9,6 +9,7 @@ import type { Album, Artist, ChatMessage, Playlist, SearchResults, Track, User }
 const BASE_URL_KEY = "raag_base_url";
 const COOKIE_KEY = "raag_session_cookie";
 const QUALITY_KEY = "raag_stream_quality";
+const DEVICE_ID_KEY = "raag_device_id";
 
 export const DEFAULT_SERVER_URL = "https://music.tejainfo.xyz";
 export const APP_VERSION = "1.0.8";
@@ -18,19 +19,29 @@ export type StreamQuality = "original" | "high" | "medium" | "low";
 let _baseUrl = "";
 let _cookie = "";
 let _streamQuality: StreamQuality = "original";
+let _deviceId = "";
 
 export async function initApi(): Promise<void> {
-  const [baseUrl, cookie, quality] = await Promise.all([
+  const [baseUrl, cookie, quality, storedDeviceId] = await Promise.all([
     AsyncStorage.getItem(BASE_URL_KEY),
     SecureStore.getItemAsync(COOKIE_KEY),
     AsyncStorage.getItem(QUALITY_KEY),
+    AsyncStorage.getItem(DEVICE_ID_KEY),
   ]);
   _baseUrl = baseUrl ?? DEFAULT_SERVER_URL;
   _cookie = cookie ?? "";
   if (quality === "original" || quality === "high" || quality === "medium" || quality === "low") {
     _streamQuality = quality;
   }
+  if (storedDeviceId) {
+    _deviceId = storedDeviceId;
+  } else {
+    _deviceId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    await AsyncStorage.setItem(DEVICE_ID_KEY, _deviceId);
+  }
 }
+
+export function getDeviceId(): string { return _deviceId; }
 
 export async function setBaseUrl(url: string): Promise<void> {
   _baseUrl = url.replace(/\/$/, "");
@@ -219,7 +230,7 @@ export const api = {
     }),
 
   // chat (server streams Server-Sent Events; never JSON)
-  chatHistory: () => request<ChatMessage[]>("/api/chat/history"),
+  chatHistory: () => request<ChatMessage[]>(`/api/chat/history?device_id=${encodeURIComponent(_deviceId)}`),
   /**
    * POST /api/chat and pump the SSE stream through `onEvent`.
    * Raises ApiError(503) with the provider detail when no local AI is up.
@@ -237,7 +248,7 @@ export const api = {
       Accept: "text/event-stream",
       ...(_cookie ? { Cookie: _cookie } : {}),
     };
-    const body = JSON.stringify({ message, now_playing: nowPlaying ?? null });
+    const body = JSON.stringify({ message, now_playing: nowPlaying ?? null, device_id: _deviceId });
 
     if (typeof XMLHttpRequest !== "undefined") {
       // React Native: fetch does not stream, so parse progress incrementally.

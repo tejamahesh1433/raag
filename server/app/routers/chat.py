@@ -24,6 +24,7 @@ HISTORY_TURNS = 12
 class ChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     now_playing: dict | None = None
+    device_id: str = Field(default="default", max_length=128)
 
 
 class ChatMessageOut(BaseModel):
@@ -73,6 +74,15 @@ def _system_prompt(db: DbSession, user: User, now_playing: dict | None) -> str:
         "- Use play_tracks when the user wants to hear something; create_playlist for playlists.",
         "- Keep answers short (1-3 sentences) unless asked for detail.",
         "- All music/AI runs locally; never suggest paid or cloud services.",
+        "- When the user asks for a mood or genre (love, sad, happy, workout, party, chill, devotional),",
+        "  call search_library multiple times with different relevant keywords.",
+        "  Examples: love → ['love','prema','pyar','romantic','ishq']",
+        "            sad → ['sad','cry','rain','dard','nuvvu']",
+        "            workout/energy → ['mass','power','energy','fight','action','beat']",
+        "            devotional → ['god','bhakti','prayer','krishna','rama','shiva']",
+        "            party/dance → ['dance','party','disco','beat','item']",
+        "            chill/slow → ['slow','soft','melody','acoustic']",
+        "  Pick the 2-3 most likely keywords for the mood and search each one.",
         "",
         f"Library: {tracks} tracks, {albums} albums, {artists} artists.",
         f"Top genres: {genre_line}.",
@@ -85,10 +95,10 @@ def _system_prompt(db: DbSession, user: User, now_playing: dict | None) -> str:
     return "\n".join(lines)
 
 
-def _history_messages(db: DbSession, user: User) -> list[dict]:
+def _history_messages(db: DbSession, user: User, device_id: str) -> list[dict]:
     rows = (
         db.query(ChatMessage)
-        .filter(ChatMessage.user_id == user.id)
+        .filter(ChatMessage.user_id == user.id, ChatMessage.device_id == device_id)
         .order_by(ChatMessage.id.desc())
         .limit(HISTORY_TURNS)
         .all()
@@ -102,10 +112,10 @@ def _sse(event: str, data: dict) -> str:
 
 
 @router.get("/history", response_model=list[ChatMessageOut])
-def history(db: DbSession = Depends(get_db), user: User = Depends(get_current_user)):
+def history(device_id: str = "default", db: DbSession = Depends(get_db), user: User = Depends(get_current_user)):
     rows = (
         db.query(ChatMessage)
-        .filter(ChatMessage.user_id == user.id)
+        .filter(ChatMessage.user_id == user.id, ChatMessage.device_id == device_id)
         .order_by(ChatMessage.id.desc())
         .limit(MAX_HISTORY)
         .all()
@@ -127,8 +137,8 @@ def history(db: DbSession = Depends(get_db), user: User = Depends(get_current_us
 
 
 @router.delete("/history")
-def clear_history(db: DbSession = Depends(get_db), user: User = Depends(get_current_user)):
-    db.query(ChatMessage).filter(ChatMessage.user_id == user.id).delete()
+def clear_history(device_id: str = "default", db: DbSession = Depends(get_db), user: User = Depends(get_current_user)):
+    db.query(ChatMessage).filter(ChatMessage.user_id == user.id, ChatMessage.device_id == device_id).delete()
     db.commit()
     return {"message": "history cleared"}
 
@@ -139,6 +149,7 @@ def _run_conversation(
     history: list[dict],
     user_text: str,
     user_id: int,
+    device_id: str = "default",
 ) -> Iterator[str]:
     """Sync generator driving the tool loop + streaming reply as SSE bytes.
 
@@ -207,6 +218,7 @@ def _run_conversation(
         try:
             assistant = ChatMessage(
                 user_id=user_id,
+                device_id=device_id,
                 role="assistant",
                 content=answer,
                 actions=json.dumps(actions_log, ensure_ascii=False),
@@ -243,18 +255,18 @@ def chat(
         )
 
     system = _system_prompt(db, user, payload.now_playing)
-    history = _history_messages(db, user)
+    history = _history_messages(db, user, payload.device_id)
 
     # Persist the user turn before streaming.
     db.add(
         ChatMessage(
-            user_id=user.id, role="user", content=payload.message, created_at=utcnow()
+            user_id=user.id, device_id=payload.device_id, role="user", content=payload.message, created_at=utcnow()
         )
     )
     db.commit()
 
     return StreamingResponse(
-        _run_conversation(ai_cfg, system, history, payload.message, user.id),
+        _run_conversation(ai_cfg, system, history, payload.message, user.id, payload.device_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

@@ -159,12 +159,13 @@ class Setting(Base):
 
 
 class ChatMessage(Base):
-    """Persisted AI assistant conversation (per user, local only)."""
+    """Persisted AI assistant conversation (per user, per device, local only)."""
 
     __tablename__ = "chat_messages"
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    device_id = Column(String(128), nullable=False, default="default", index=True)
     role = Column(String(16), nullable=False)  # user | assistant
     content = Column(Text, nullable=False, default="")
     actions = Column(Text, default="")  # JSON list of tool/action summaries
