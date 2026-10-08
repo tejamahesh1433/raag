@@ -9,6 +9,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Artwork } from "../components/Artwork";
 import { COLORS, SPACING } from "../theme/android";
@@ -18,6 +20,7 @@ import type { Track } from "../types";
 
 export function FavoritesScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [favorites, setFavorites] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -47,6 +50,14 @@ export function FavoritesScreen() {
   return (
     <FlatList
       style={[styles.root, { paddingTop: insets.top }]}
+      ListHeaderComponent={
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Favorites</Text>
+          <TouchableOpacity onPress={() => navigation.navigate("Settings" as any)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <MaterialIcons name="settings" size={24} color={COLORS.muted} />
+          </TouchableOpacity>
+        </View>
+      }
       data={favorites}
       keyExtractor={(item) => String(item.id)}
       renderItem={({ item, index }) => (
@@ -86,6 +97,19 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLORS.bg,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.sm,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: COLORS.onBg,
   },
   center: {
     flex: 1,

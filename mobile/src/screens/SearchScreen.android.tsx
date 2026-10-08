@@ -71,7 +71,12 @@ export function SearchScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <Text style={styles.largeTitle}>Search</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.largeTitle}>Search</Text>
+        <TouchableOpacity onPress={() => navigation.navigate("Settings" as any)} style={styles.settingsBtn}>
+          <MaterialIcons name="settings" size={24} color={COLORS.muted} />
+        </TouchableOpacity>
+      </View>
 
       {/* Search bar */}
       <View style={styles.searchBar}>
@@ -192,6 +197,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.bg,
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingRight: SPACING.md,
+  },
   largeTitle: {
     fontSize: 28,
     fontWeight: "900",
@@ -199,6 +210,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
     paddingBottom: SPACING.sm,
+  },
+  settingsBtn: {
+    padding: SPACING.sm,
   },
   searchBar: {
     flexDirection: "row",
@@ -229,10 +243,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   genreGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: SPACING.sm,
   },
   genreChip: {
-    flex: 1,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.pill,

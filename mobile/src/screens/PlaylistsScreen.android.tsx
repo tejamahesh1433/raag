@@ -99,9 +99,14 @@ export function PlaylistsScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.largeTitle}>Playlists</Text>
-        <TouchableOpacity onPress={handleCreate} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <MaterialIcons name="add-circle" size={28} color={COLORS.accent} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 4 }}>
+          <TouchableOpacity onPress={handleCreate} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <MaterialIcons name="add-circle" size={28} color={COLORS.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("Settings" as any)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <MaterialIcons name="settings" size={26} color={COLORS.muted} />
+          </TouchableOpacity>
+        </View>
       </View>
       <FlatList
         data={playlists}

@@ -72,12 +72,20 @@ export function HomeScreen() {
             />
             <Text style={styles.wordmark}>Raag</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => navigation.getParent()?.navigate("SearchTab")}
-            style={styles.headerBtn}
-          >
-            <MaterialIcons name="search" size={24} color={COLORS.onBg} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: SPACING.xs }}>
+            <TouchableOpacity
+              onPress={() => navigation.getParent()?.navigate("SearchTab")}
+              style={styles.headerBtn}
+            >
+              <MaterialIcons name="search" size={24} color={COLORS.onBg} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate("Settings")}
+              style={styles.headerBtn}
+            >
+              <MaterialIcons name="settings" size={24} color={COLORS.onBg} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {loading ? (

@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../api";
 import type { ChatMessage, Track } from "../types";
 import { usePlayer } from "../store/player";
@@ -33,6 +35,7 @@ function renderNotice(notice: string): string {
 
 export function ChatScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notices, setNotices] = useState<Record<string, string[]>>({});
   const [input, setInput] = useState("");
@@ -153,6 +156,12 @@ export function ChatScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={styles.chatHeader}>
+        <Text style={styles.chatTitle}>Chat</Text>
+        <TouchableOpacity onPress={() => navigation.navigate("Settings")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <MaterialIcons name="settings" size={24} color={COLORS.muted} />
+        </TouchableOpacity>
+      </View>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.flex}
@@ -205,6 +214,18 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLORS.bg,
+  },
+  chatHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  chatTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: COLORS.onBg,
   },
   flex: {
     flex: 1,

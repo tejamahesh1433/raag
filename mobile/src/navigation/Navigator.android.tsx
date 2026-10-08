@@ -67,6 +67,7 @@ function SearchStack() {
       <SearchStackNav.Screen name="Search" component={SearchScreen} options={{ headerShown: false }} />
       <SearchStackNav.Screen name="ArtistDetail" component={ArtistDetailScreen} options={{ title: "" }} />
       <SearchStackNav.Screen name="AlbumDetail" component={AlbumDetailScreen} options={{ title: "" }} />
+      <SearchStackNav.Screen name="Settings" component={SettingsScreen} options={{ presentation: "modal", headerShown: false }} />
     </SearchStackNav.Navigator>
   );
 }
@@ -76,6 +77,7 @@ function PlaylistsStack() {
     <PlaylistsStackNav.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
       <PlaylistsStackNav.Screen name="Playlists" component={PlaylistsScreen} options={{ headerShown: false }} />
       <PlaylistsStackNav.Screen name="PlaylistDetail" component={PlaylistDetailScreen} options={{ title: "" }} />
+      <PlaylistsStackNav.Screen name="Settings" component={SettingsScreen} options={{ presentation: "modal", headerShown: false }} />
     </PlaylistsStackNav.Navigator>
   );
 }
@@ -84,6 +86,7 @@ function FavoritesStack() {
   return (
     <FavoritesStackNav.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
       <FavoritesStackNav.Screen name="Favorites" component={FavoritesScreen} options={{ headerShown: false }} />
+      <FavoritesStackNav.Screen name="Settings" component={SettingsScreen} options={{ presentation: "modal", headerShown: false }} />
     </FavoritesStackNav.Navigator>
   );
 }
@@ -92,6 +95,7 @@ function ChatStack() {
   return (
     <ChatStackNav.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
       <ChatStackNav.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
+      <ChatStackNav.Screen name="Settings" component={SettingsScreen} options={{ presentation: "modal", headerShown: false }} />
     </ChatStackNav.Navigator>
   );
 }
