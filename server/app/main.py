@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config
 from .db import SessionLocal, init_db
-from .routers import auth, chat, discovery, library, organization, playlists, subsonic, sync, system
+from .routers import ai_tags, auth, chat, discovery, library, organization, playlists, subsonic, sync, system
 
 # Built SPA (web/dist). When present, the server hosts the frontend itself —
 # one process is enough for LAN use; Caddy is only needed for public HTTPS.
@@ -84,6 +84,7 @@ def create_app() -> FastAPI:
     app.include_router(organization.router)
     app.include_router(subsonic.router)
     app.include_router(sync.router)
+    app.include_router(ai_tags.router)
     _mount_spa(app)
     return app
 

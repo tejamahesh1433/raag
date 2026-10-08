@@ -57,6 +57,19 @@ engine = _make_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
+def _migrate_tracks_mood() -> None:
+    """Add mood column to tracks if it doesn't exist."""
+    with engine.begin() as conn:
+        try:
+            conn.exec_driver_sql("ALTER TABLE tracks ADD COLUMN mood TEXT NOT NULL DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_tracks_mood ON tracks (mood)")
+        except Exception:
+            pass
+
+
 def _migrate_chat_messages_device_id() -> None:
     """Add device_id column to chat_messages if it doesn't exist (one-time migration)."""
     with engine.begin() as conn:
@@ -79,6 +92,7 @@ def init_db() -> None:
     from . import models  # noqa: F401  (register mappings)
 
     metadata.create_all(engine)
+    _migrate_tracks_mood()
     _migrate_chat_messages_device_id()
     # Execute raw schema; statements are split with sqlite3.complete_statement
     # because CREATE TRIGGER bodies contain semicolons.

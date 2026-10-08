@@ -147,25 +147,58 @@ def execute_tool(
             raise HTTPException(status_code=400, detail="query is required")
         limit = min(int(args.get("limit") or 15), MAX_SEARCH_RESULTS)
         from sqlalchemy import or_
-        words = [w for w in query.split() if len(w) >= 2]
-        if not words:
-            words = [query]
-        word_filters = []
-        for w in words:
-            like = f"%{w}%"
-            word_filters += [
-                Track.title.ilike(like),
-                Track.artist_name.ilike(like),
-                Track.album_title.ilike(like),
-                Track.genre.ilike(like),
-            ]
-        rows = (
-            db.query(Track)
-            .filter(or_(*word_filters))
-            .order_by(Track.play_count.desc(), Track.title.asc())
-            .limit(limit)
-            .all()
-        )
+        MOOD_ALIASES = {
+            "romantic": "romantic", "love": "romantic", "romance": "romantic",
+            "devotional": "devotional", "bhakti": "devotional", "religious": "devotional",
+            "energetic": "energetic", "workout": "energetic", "energy": "energetic",
+            "dance": "energetic", "party": "energetic", "mass": "energetic",
+            "sad": "sad", "emotional": "sad", "heartbreak": "sad",
+            "happy": "happy", "cheerful": "happy", "upbeat": "happy",
+            "chill": "chill", "slow": "chill", "soft": "chill", "calm": "chill",
+        }
+        # Check if query maps directly to a mood tag
+        mood_hit = MOOD_ALIASES.get(query.lower().strip())
+        if mood_hit:
+            rows = (
+                db.query(Track)
+                .filter(Track.mood == mood_hit)
+                .order_by(Track.play_count.desc(), Track.title.asc())
+                .limit(limit)
+                .all()
+            )
+            # Fall back to keyword search if mood column not yet populated
+            if not rows:
+                like = f"%{query.split()[0]}%"
+                rows = (
+                    db.query(Track)
+                    .filter(or_(
+                        Track.title.ilike(like), Track.artist_name.ilike(like),
+                        Track.album_title.ilike(like), Track.genre.ilike(like),
+                    ))
+                    .order_by(Track.play_count.desc(), Track.title.asc())
+                    .limit(limit)
+                    .all()
+                )
+        else:
+            words = [w for w in query.split() if len(w) >= 2]
+            if not words:
+                words = [query]
+            word_filters = []
+            for w in words:
+                like = f"%{w}%"
+                word_filters += [
+                    Track.title.ilike(like),
+                    Track.artist_name.ilike(like),
+                    Track.album_title.ilike(like),
+                    Track.genre.ilike(like),
+                ]
+            rows = (
+                db.query(Track)
+                .filter(or_(*word_filters))
+                .order_by(Track.play_count.desc(), Track.title.asc())
+                .limit(limit)
+                .all()
+            )
         return {"tracks": [_track_summary(t) for t in rows], "count": len(rows)}, None
 
     if name == "library_overview":

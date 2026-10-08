@@ -93,6 +93,7 @@ class Track(Base):
 
     play_count = Column(Integer, nullable=False, default=0)
     added_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+    mood = Column(String(32), nullable=False, default="", index=True)
 
 
 class Playlist(Base):
