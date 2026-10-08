@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Artwork } from "../components/Artwork";
 import { COLORS, SPACING } from "../theme/android";
@@ -16,6 +17,7 @@ import { usePlayer } from "../store/player";
 import type { Track } from "../types";
 
 export function FavoritesScreen() {
+  const insets = useSafeAreaInsets();
   const [favorites, setFavorites] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,7 +38,7 @@ export function FavoritesScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.root, styles.center]}>
+      <View style={[styles.root, styles.center, { paddingTop: insets.top }]}>
         <ActivityIndicator color={COLORS.accent} />
       </View>
     );
@@ -44,7 +46,7 @@ export function FavoritesScreen() {
 
   return (
     <FlatList
-      style={styles.root}
+      style={[styles.root, { paddingTop: insets.top }]}
       data={favorites}
       keyExtractor={(item) => String(item.id)}
       renderItem={({ item, index }) => (
@@ -95,7 +97,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   listContent: {
-    paddingBottom: SPACING.xl,
+    paddingBottom: 140,
   },
   emptyText: {
     color: COLORS.muted,

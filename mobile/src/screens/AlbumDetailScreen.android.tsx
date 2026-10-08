@@ -78,7 +78,7 @@ export function AlbumDetailScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
-      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }}>
         {/* Artwork - Material 3 hero */}
         <View style={styles.artworkSection}>
           <View style={styles.artworkWrapper}>

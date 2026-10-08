@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../api";
 import type { ChatMessage, Track } from "../types";
 import { usePlayer } from "../store/player";
@@ -31,6 +32,7 @@ function renderNotice(notice: string): string {
 }
 
 export function ChatScreen() {
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notices, setNotices] = useState<Record<string, string[]>>({});
   const [input, setInput] = useState("");
@@ -150,7 +152,7 @@ export function ChatScreen() {
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.flex}
@@ -271,7 +273,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingTop: SPACING.sm,
+    paddingBottom: 84,
     gap: SPACING.sm,
     backgroundColor: COLORS.surface,
     borderTopWidth: StyleSheet.hairlineWidth,

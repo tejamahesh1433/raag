@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     color: COLORS.onBg,
   },
   scrollContent: {
-    paddingBottom: 60,
+    paddingBottom: 140,
   },
   sectionHeader: {
     fontSize: 12,

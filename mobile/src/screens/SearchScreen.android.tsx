@@ -104,7 +104,7 @@ export function SearchScreen({ navigation }: Props) {
               </Pressable>
             ))}
           </View>
-          <View style={{ height: SPACING.xl * 2 }} />
+          <View style={{ height: 140 }} />
         </ScrollView>
       ) : (
         /* Results */
@@ -180,7 +180,7 @@ export function SearchScreen({ navigation }: Props) {
               )}
             </>
           )}
-          <View style={{ height: SPACING.xl * 2 }} />
+          <View style={{ height: 140 }} />
         </ScrollView>
       )}
     </SafeAreaView>
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   },
   browseContent: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingBottom: 140,
   },
   browseTitle: {
     fontSize: 20,
