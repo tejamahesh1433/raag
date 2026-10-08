@@ -13,6 +13,12 @@ services:
       MUSIC_ADMIN_USER: "${MUSIC_ADMIN_USER:-teja}"
       MUSIC_ADMIN_PASSWORD: "${MUSIC_ADMIN_PASSWORD}"
       MUSIC_LIBRARY_ROOTS: '["/music"]'
+      MUSIC_AI_PROVIDER: "ollama"
+      MUSIC_AI_BASE_URL: "http://host.docker.internal:11434/v1"
+      MUSIC_AI_CHAT_MODEL: "qwen2.5:3b"
+      MUSIC_AI_EMBED_MODEL: "nomic-embed-text"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - music-data:/data
       - ${MUSIC_LIBRARY_HOST_PATH:-./library}:/music:ro
