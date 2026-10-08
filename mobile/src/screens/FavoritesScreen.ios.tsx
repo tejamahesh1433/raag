@@ -10,10 +10,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { api } from "../api";
 import type { Track } from "../types";
 import { usePlayer } from "../store/player";
-import { COLORS, FONT, RADIUS, SPACING } from "../theme/ios";
+import { COLORS, FONT, RADIUS, SHADOW, SPACING } from "../theme/ios";
 
 export default function FavoritesScreen() {
   const [favorites, setFavorites] = useState<Track[]>([]);
@@ -21,6 +22,7 @@ export default function FavoritesScreen() {
 
   const currentIndex = usePlayer((s) => s.index);
   const queue = usePlayer((s) => s.queue);
+  const isPlaying = usePlayer((s) => s.playing);
   const currentId = currentIndex >= 0 ? queue[currentIndex]?.id : undefined;
 
   useEffect(() => {
@@ -35,83 +37,125 @@ export default function FavoritesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <Text style={styles.largeTitle}>Favorites</Text>
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={COLORS.accent} />
+    <View style={styles.root}>
+      {/* Ambient background gradient */}
+      <LinearGradient
+        colors={["#160c1c", "#0a0910", "#030305"]}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.header}>
+          <Text style={styles.largeTitle}>Favorites</Text>
         </View>
-      ) : (
-        <FlatList
-          data={favorites}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={favorites.length === 0 ? styles.emptyContent : styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.center}>
-              <Text style={styles.emptyText}>No favorites yet</Text>
-            </View>
-          }
-          renderItem={({ item, index }) => {
-            const artworkUri = api.artworkUrl(item.artwork_id);
-            const isPlaying = item.id === currentId;
-            return (
-              <TouchableOpacity
-                style={styles.listRow}
-                activeOpacity={0.7}
-                onPress={() => usePlayer.getState().playNow(favorites, index)}
-              >
-                {artworkUri ? (
-                  <Image
-                    source={{ uri: artworkUri }}
-                    style={styles.artwork}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View style={[styles.artwork, styles.artworkFallback]} />
-                )}
-                <View style={styles.rowText}>
-                  <Text
-                    style={[styles.rowTitle, isPlaying && styles.rowTitlePlaying]}
-                    numberOfLines={1}
-                  >
-                    {item.title}
-                  </Text>
-                  <Text style={styles.rowSub} numberOfLines={1}>{item.artist}</Text>
-                </View>
+
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={COLORS.accent} />
+          </View>
+        ) : (
+          <FlatList
+            data={favorites}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={favorites.length === 0 ? styles.emptyContent : styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.center}>
+                <Ionicons name="heart-dislike-outline" size={54} color={COLORS.muted} />
+                <Text style={styles.emptyText}>No favorites yet</Text>
+                <Text style={styles.emptySubtext}>Heart your favorite songs to see them here</Text>
+              </View>
+            }
+            renderItem={({ item, index }) => {
+              const artworkUri = api.artworkUrl(item.artwork_id);
+              const isCurrent = item.id === currentId;
+              return (
                 <TouchableOpacity
-                  onPress={() => handleUnfavorite(item)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={[styles.listRow, isCurrent && styles.listRowActive]}
+                  activeOpacity={0.7}
+                  onPress={() => usePlayer.getState().playNow(favorites, index)}
                 >
-                  <Ionicons name="heart" size={22} color={COLORS.accent} />
+                  {/* Glossy Artwork Thumbnail */}
+                  <View style={styles.artworkContainer}>
+                    {artworkUri ? (
+                      <Image
+                        source={{ uri: artworkUri }}
+                        style={styles.artwork}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View style={[styles.artwork, styles.artworkFallback]} />
+                    )}
+                    {/* Subtle Sheen */}
+                    <LinearGradient
+                      colors={["rgba(255, 255, 255, 0.28)", "transparent"]}
+                      style={StyleSheet.absoluteFill}
+                      pointerEvents="none"
+                    />
+                    <View style={styles.thumbnailRim} pointerEvents="none" />
+                  </View>
+
+                  <View style={styles.rowText}>
+                    <Text
+                      style={[styles.rowTitle, isCurrent && styles.rowTitlePlaying]}
+                      numberOfLines={1}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text style={styles.rowSub} numberOfLines={1}>{item.artist}</Text>
+                  </View>
+
+                  {isCurrent && (
+                    <Ionicons
+                      name={isPlaying ? "volume-high" : "pause"}
+                      size={16}
+                      color={COLORS.accent}
+                      style={{ marginRight: 6 }}
+                    />
+                  )}
+
+                  <TouchableOpacity
+                    onPress={() => handleUnfavorite(item)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    style={styles.heartButton}
+                  >
+                    <Ionicons name="heart" size={22} color={COLORS.accent} />
+                  </TouchableOpacity>
                 </TouchableOpacity>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      )}
-    </SafeAreaView>
+              );
+            }}
+          />
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  root: {
     flex: 1,
     backgroundColor: COLORS.bg,
+  },
+  safe: {
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xs,
   },
   largeTitle: {
     fontSize: 34,
     fontWeight: "700",
     color: COLORS.label,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-    paddingBottom: SPACING.xs,
+    letterSpacing: -0.4,
   },
   center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: SPACING.xl,
+    gap: SPACING.sm,
   },
   emptyContent: {
     flexGrow: 1,
@@ -121,7 +165,14 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: FONT.body,
+    fontWeight: "600",
     color: COLORS.secondaryLabel,
+    textAlign: "center",
+    marginTop: SPACING.xs,
+  },
+  emptySubtext: {
+    fontSize: FONT.subheadline,
+    color: COLORS.muted,
     textAlign: "center",
   },
   listRow: {
@@ -131,15 +182,32 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.separator,
-    gap: SPACING.sm,
+    gap: SPACING.md,
+  },
+  listRowActive: {
+    backgroundColor: "rgba(255, 45, 85, 0.08)",
+  },
+  artworkContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.sm,
+    overflow: "hidden",
+    position: "relative",
+    backgroundColor: COLORS.surfaceSecondary,
+    ...SHADOW.card,
   },
   artwork: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.sm,
+    width: "100%",
+    height: "100%",
   },
   artworkFallback: {
     backgroundColor: COLORS.surfaceSecondary,
+  },
+  thumbnailRim: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: RADIUS.sm,
+    borderWidth: 0.5,
+    borderColor: "rgba(255, 255, 255, 0.16)",
   },
   rowText: {
     flex: 1,
@@ -150,11 +218,15 @@ const styles = StyleSheet.create({
     color: COLORS.label,
   },
   rowTitlePlaying: {
+    fontWeight: "600",
     color: COLORS.accent,
   },
   rowSub: {
     fontSize: FONT.footnote,
     color: COLORS.secondaryLabel,
-    marginTop: 1,
+    marginTop: 2,
+  },
+  heartButton: {
+    padding: 4,
   },
 });

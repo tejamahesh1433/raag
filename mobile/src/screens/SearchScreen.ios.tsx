@@ -11,13 +11,14 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../api";
 import { usePlayer } from "../store/player";
 import type { Album, Artist, SearchResults, Track } from "../types";
 import AlbumCard from "../components/AlbumCard.ios";
-import { COLORS, FONT, RADIUS, SPACING } from "../theme/ios";
+import { COLORS, FONT, RADIUS, SHADOW, SPACING } from "../theme/ios";
 
 interface Props {
   navigation: NativeStackNavigationProp<any>;
@@ -98,45 +99,62 @@ export default function SearchScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <Text style={styles.largeTitle}>Search</Text>
+    <View style={styles.root}>
+      {/* Ambient background gradient */}
+      <LinearGradient
+        colors={["#160c1c", "#0a0910", "#030305"]}
+        style={StyleSheet.absoluteFill}
+      />
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <Text style={styles.largeTitle}>Search</Text>
 
-      {/* Search bar */}
-      <View style={styles.searchBar}>
-        <Ionicons name="search" size={16} color={COLORS.muted} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Artists, songs, albums"
-          placeholderTextColor={COLORS.muted}
-          value={query}
-          onChangeText={setQuery}
-          returnKeyType="search"
-          autoCorrect={false}
-          autoCapitalize="none"
-          clearButtonMode="while-editing"
-        />
-        {searching && <ActivityIndicator size="small" color={COLORS.muted} style={{ marginRight: SPACING.sm }} />}
-      </View>
+        {/* Glossy frosted Search bar */}
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={17} color="rgba(255,255,255,0.6)" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Artists, songs, albums"
+            placeholderTextColor="rgba(255,255,255,0.4)"
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
+          />
+          {searching && <ActivityIndicator size="small" color={COLORS.accent} style={{ marginRight: SPACING.sm }} />}
+        </View>
 
-      {!query.trim() ? (
-        /* Browse categories */
-        <ScrollView contentContainerStyle={styles.browseContent} showsVerticalScrollIndicator={false}>
-          <Text style={styles.browseTitle}>Browse Categories</Text>
-          {rows.map((row, ri) => (
-            <View key={ri} style={styles.genreRow}>
-              {row.map((g, ci) => (
-                <TouchableOpacity
-                  key={g.genre}
-                  style={[styles.genreTile, { backgroundColor: GENRE_BG_COLORS[(ri * cols + ci) % GENRE_BG_COLORS.length] }]}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.genreTileText}>{g.genre}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ))}
-          <View style={{ height: 120 }} />
-        </ScrollView>
+        {!query.trim() ? (
+          /* Browse categories with Apple Glossy 3D Tiles */
+          <ScrollView contentContainerStyle={styles.browseContent} showsVerticalScrollIndicator={false}>
+            <Text style={styles.browseTitle}>Browse Categories</Text>
+            {rows.map((row, ri) => (
+              <View key={ri} style={styles.genreRow}>
+                {row.map((g, ci) => (
+                  <TouchableOpacity
+                    key={g.genre}
+                    style={[styles.genreTile, { backgroundColor: GENRE_BG_COLORS[(ri * cols + ci) % GENRE_BG_COLORS.length] }]}
+                    activeOpacity={0.8}
+                    onPress={() => setQuery(g.genre)}
+                  >
+                    {/* Glossy Sheen Overlay */}
+                    <LinearGradient
+                      colors={["rgba(255,255,255,0.34)", "rgba(255,255,255,0.06)", "transparent"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 0.7, y: 0.7 }}
+                      style={StyleSheet.absoluteFill}
+                      pointerEvents="none"
+                    />
+                    {/* Specular Rim */}
+                    <View style={styles.genreRim} pointerEvents="none" />
+                    <Text style={styles.genreTileText}>{g.genre}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+            <View style={{ height: 140 }} />
+          </ScrollView>
       ) : (
         /* Results */
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -199,6 +217,7 @@ export default function SearchScreen({ navigation }: Props) {
                       key={artist.id}
                       style={styles.artistRow}
                       activeOpacity={0.7}
+                      onPress={() => navigation.navigate("ArtistDetail", { artistId: artist.id, artistName: artist.name })}
                     >
                       <View style={styles.artistAvatar}>
                         <Text style={styles.avatarLetter}>{artist.name[0]?.toUpperCase()}</Text>
@@ -217,19 +236,24 @@ export default function SearchScreen({ navigation }: Props) {
           <View style={{ height: 120 }} />
         </ScrollView>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  root: {
     flex: 1,
     backgroundColor: COLORS.bg,
+  },
+  safe: {
+    flex: 1,
   },
   largeTitle: {
     fontSize: 34,
     fontWeight: "700",
     color: COLORS.label,
+    letterSpacing: -0.5,
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
     paddingBottom: SPACING.sm,
@@ -237,12 +261,16 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surfaceSecondary,
-    borderRadius: 12,
+    backgroundColor: "rgba(32, 32, 42, 0.72)",
+    borderRadius: RADIUS.lg,
     marginHorizontal: SPACING.md,
     marginBottom: SPACING.md,
-    paddingVertical: 9,
-    paddingHorizontal: SPACING.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.14)",
+    borderTopColor: "rgba(255, 255, 255, 0.35)",
+    ...SHADOW.card,
   },
   searchIcon: {
     marginRight: SPACING.xs,
@@ -258,9 +286,10 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xl,
   },
   browseTitle: {
-    fontSize: FONT.title3,
+    fontSize: 21,
     fontWeight: "700",
     color: COLORS.label,
+    letterSpacing: -0.3,
     marginBottom: SPACING.md,
   },
   genreRow: {
@@ -270,11 +299,21 @@ const styles = StyleSheet.create({
   },
   genreTile: {
     flex: 1,
-    height: 90,
+    height: 94,
     borderRadius: RADIUS.md,
     alignItems: "flex-start",
     justifyContent: "flex-end",
     padding: SPACING.sm,
+    overflow: "hidden",
+    position: "relative",
+    ...SHADOW.card,
+  },
+  genreRim: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.18)",
+    borderTopColor: "rgba(255, 255, 255, 0.45)",
   },
   genreTileText: {
     fontSize: FONT.callout,
