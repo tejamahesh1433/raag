@@ -11,6 +11,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { initApi } from "./src/api";
 import { useAuth } from "./src/store/auth";
+import { ConnectScreen } from "./src/screens/ConnectScreen";
 
 // Platform-specific navigation bundles
 const AppNavigator =
@@ -41,6 +42,10 @@ function Root() {
 
   if (loading) {
     return <View style={{ flex: 1, backgroundColor: "#14241c" }} />;
+  }
+
+  if (!user) {
+    return <ConnectScreen />;
   }
 
   return <AppNavigator />;
