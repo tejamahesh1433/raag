@@ -31,6 +31,9 @@ def resolve_base_url(ai_cfg: dict) -> str:
     custom = str(ai_cfg.get("base_url") or "").strip().rstrip("/")
     if custom:
         return custom
+    # Env var takes priority over hardcoded defaults (useful inside Docker)
+    if config.AI_BASE_URL:
+        return config.AI_BASE_URL.rstrip("/")
     provider = str(ai_cfg.get("provider") or "ollama")
     return DEFAULT_URLS.get(provider, DEFAULT_URLS["ollama"])
 
