@@ -96,6 +96,14 @@ body {
   scrollbar-color: #8a9a90 transparent;
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 audio {
   display: none;
 }

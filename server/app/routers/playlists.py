@@ -538,6 +538,6 @@ def export_m3u(
     return Response(
         content=content,
         media_type="audio/x-mpegurl",
-        headers={"Content-Disposition": f'attachment; filename="{playlist.name}.m3u"'},
+        headers={"Content-Disposition": f'attachment; filename="{re.sub(r"[\\x00-\\x1f\"\\\\]", "_", playlist.name)}.m3u"'},
     )
 

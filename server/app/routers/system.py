@@ -1,7 +1,10 @@
 """Settings, background jobs, and health status."""
+import ipaddress
 import json
 import platform
 import shutil
+import socket
+import urllib.parse
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -104,6 +107,35 @@ def get_settings(db: DbSession = Depends(get_db), user: User = Depends(get_curre
     return _get_settings(db)
 
 
+_SSRF_BLOCKED_NETS = [
+    ipaddress.ip_network(n)
+    for n in (
+        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+        "127.0.0.0/8", "169.254.0.0/16",
+        "::1/128", "fc00::/7", "fe80::/10",
+    )
+]
+
+
+def _validate_ai_base_url(url: str) -> None:
+    if not url:
+        return
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="ai.base_url must use http or https")
+    hostname = parsed.hostname or ""
+    try:
+        for info in socket.getaddrinfo(hostname, None):
+            addr = ipaddress.ip_address(info[4][0])
+            if any(addr in net for net in _SSRF_BLOCKED_NETS):
+                raise HTTPException(
+                    status_code=400,
+                    detail="ai.base_url must not target private or reserved addresses",
+                )
+    except socket.gaierror:
+        pass
+
+
 @router.put("/settings", response_model=SettingsOut)
 def update_settings(
     payload: SettingsUpdate,
@@ -112,6 +144,8 @@ def update_settings(
 ):
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin only")
+    if payload.ai and "base_url" in (payload.ai or {}):
+        _validate_ai_base_url(str(payload.ai.get("base_url") or ""))
     current = _get_settings(db)
     return _save_settings(db, payload, current)
 

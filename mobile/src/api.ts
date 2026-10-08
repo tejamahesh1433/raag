@@ -3,6 +3,7 @@
  * Handles cookie-based session auth by storing the Set-Cookie header manually.
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import type { Album, Artist, ChatMessage, Playlist, SearchResults, Track, User } from "./types";
 
 const BASE_URL_KEY = "raag_base_url";
@@ -18,7 +19,7 @@ let _streamQuality: StreamQuality = "original";
 export async function initApi(): Promise<void> {
   const [baseUrl, cookie, quality] = await Promise.all([
     AsyncStorage.getItem(BASE_URL_KEY),
-    AsyncStorage.getItem(COOKIE_KEY),
+    SecureStore.getItemAsync(COOKIE_KEY),
     AsyncStorage.getItem(QUALITY_KEY),
   ]);
   _baseUrl = baseUrl ?? "";
@@ -80,7 +81,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       const match = setCookie.match(/([^;]+)/);
       if (match) {
         _cookie = match[1];
-        await AsyncStorage.setItem(COOKIE_KEY, _cookie);
+        await SecureStore.setItemAsync(COOKIE_KEY, _cookie);
       }
     }
     if (res.status === 401) throw new ApiError(401, "Not authenticated");
@@ -102,7 +103,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export async function clearSession(): Promise<void> {
   _cookie = "";
-  await AsyncStorage.removeItem(COOKIE_KEY);
+  await SecureStore.deleteItemAsync(COOKIE_KEY);
 }
 
 export interface SSEChatEvent {

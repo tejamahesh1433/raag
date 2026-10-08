@@ -16,6 +16,7 @@ import { PlaylistDetailPage } from "./pages/PlaylistDetail";
 import { PlaylistsPage } from "./pages/Playlists";
 import { SearchPage } from "./pages/Search";
 import { SettingsPage } from "./pages/Settings";
+import { DownloadPage } from "./pages/Download";
 import { SetupWizard } from "./pages/SetupWizard";
 import { api } from "./api";
 import { useAuth } from "./store/auth";
@@ -87,6 +88,7 @@ export default function App() {
         <Route path="/stats" element={<StatsPage />} />
         <Route path="/genres/:name" element={<GenrePage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/download" element={<DownloadPage />} />
         <Route path="*" element={<Navigate to="/library" replace />} />
       </Route>
     </Routes>

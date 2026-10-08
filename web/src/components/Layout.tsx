@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { usePlayer } from "../store/player";
 import { BrandLogo, BrandWordmark, APP_TAGLINE } from "./Brand";
 import {
+  IconDownload,
   IconHeart,
   IconLibrary,
   IconPlaylist,
@@ -26,6 +27,7 @@ const navItems = [
   { to: "/queue", label: "Queue", Icon: IconQueue },
   { to: "/stats", label: "Stats", Icon: IconChart },
   { to: "/settings", label: "Settings", Icon: IconSettings },
+  { to: "/download", label: "Download", Icon: IconDownload },
 ];
 
 function NavItems({ vertical = false }: { vertical?: boolean }) {
@@ -37,7 +39,7 @@ function NavItems({ vertical = false }: { vertical?: boolean }) {
           to={to}
           className={({ isActive }) =>
             [
-              vertical ? "nav-link" : "flex min-w-0 flex-1 flex-col items-center gap-1 py-2 text-[10px] font-medium text-muted transition-colors",
+              vertical ? "nav-link" : "flex shrink-0 min-w-[3.5rem] flex-col items-center gap-1 py-2 text-[10px] font-medium text-muted transition-colors",
               vertical && isActive ? "nav-link-active" : "",
               !vertical && isActive ? "text-ink" : "",
               !vertical && !isActive ? "hover:text-ink" : "",
@@ -98,7 +100,7 @@ export function Layout() {
 
       <MiniPlayer />
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex gap-0.5 border-t border-border bg-panel/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex gap-0.5 overflow-x-auto scrollbar-none border-t border-border bg-panel/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
         <NavItems />
       </nav>
     </div>

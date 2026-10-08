@@ -6,6 +6,7 @@ to connect, stream, and browse your Raag library seamlessly.
 from __future__ import annotations
 
 import base64
+import xml.sax.saxutils
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -17,7 +18,7 @@ from .. import config
 from ..deps import get_db
 from ..models import Album, Artist, Artwork, Favorite, PlayEvent, Playlist, PlaylistTrack, Track
 from ..services import streaming as stream_svc
-from .library import _favorite_ids
+from .library import _favorite_ids, _is_under_roots
 
 router = APIRouter(prefix="/rest", tags=["subsonic"])
 
@@ -53,7 +54,7 @@ def _format_subsonic_response(
             if isinstance(obj, dict):
                 attrs = " ".join(
                     [
-                        f'{k}="{v}"'
+                        f'{k}="{xml.sax.saxutils.escape(str(v), {chr(34): "&quot;"})}"'
                         for k, v in obj.items()
                         if not isinstance(v, (dict, list))
                     ]
@@ -187,6 +188,8 @@ def stream(
     track = db.get(Track, track_id)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
+    if not _is_under_roots(track.path, db):
+        raise HTTPException(status_code=403, detail="Track path outside configured roots")
 
     range_header = request.headers.get("range")
     return stream_svc.stream_track_file(Path(track.path), range_header, transcode=True)

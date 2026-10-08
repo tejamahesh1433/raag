@@ -208,3 +208,13 @@ export function IconChart({ className, size = 20 }: IconProps) {
     </svg>
   );
 }
+
+export function IconDownload({ className, size = 20 }: IconProps) {
+  const p = base(className, size);
+  return (
+    <svg viewBox="0 0 24 24" {...p}>
+      <path d="M12 3v13M7 11l5 5 5-5" />
+      <path d="M3 19h18" strokeWidth={1.75} />
+    </svg>
+  );
+}
