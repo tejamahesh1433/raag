@@ -136,7 +136,7 @@ export default function HomeScreen({ navigation }: Props) {
               contentContainerStyle={styles.hScroll}
             >
               {recentlyPlayed.map((track) => {
-                const uri = api.artworkUrl(track.album_id);
+                const uri = api.artworkUrl(track.artwork_id);
                 return (
                   <View key={track.id} style={styles.recentItem}>
                     {uri ? (

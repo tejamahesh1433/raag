@@ -86,7 +86,7 @@ export function TrackItem({
       onLongPress={onLongPress}
     >
       <View style={styles.artworkWrap}>
-        <Artwork artworkId={artworkId ?? null} size={48} />
+        <Artwork artworkId={artworkId ?? track.artwork_id ?? null} size={48} />
         {isPlaying && (
           <View style={styles.barsOverlay}>
             <PlayingBars />

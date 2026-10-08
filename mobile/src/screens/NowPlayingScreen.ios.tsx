@@ -165,7 +165,7 @@ export default function NowPlayingScreen({ navigation }: Props) {
   const [showQueue, setShowQueue] = useState(false);
 
   const track = index >= 0 ? queue[index] : null;
-  const artworkUri = track ? api.artworkUrl(track.album_id) : null;
+  const artworkUri = track ? api.artworkUrl(track.artwork_id) : null;
 
   const repeatColor = repeat !== "none" ? COLORS.accent : COLORS.muted;
   const shuffleColor = shuffle ? COLORS.accent : COLORS.muted;
@@ -257,7 +257,7 @@ export default function NowPlayingScreen({ navigation }: Props) {
           <Animated.ScrollView style={styles.queueList} showsVerticalScrollIndicator={false}>
             {queue.slice(index + 1, index + 20).map((t, offset) => {
               const actualIdx = index + 1 + offset;
-              const uri = api.artworkUrl(t.album_id);
+              const uri = api.artworkUrl(t.artwork_id);
               return (
                 <TouchableOpacity
                   key={`${t.id}-${actualIdx}`}

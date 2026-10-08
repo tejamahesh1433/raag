@@ -59,7 +59,7 @@ export default function PlaylistDetailScreen({ navigation, route }: Props) {
   }
 
   function renderTrack({ item, index }: { item: Track; index: number }) {
-    const uri = api.artworkUrl(item.album_id);
+    const uri = api.artworkUrl(item.artwork_id);
     return (
       <TouchableOpacity
         style={styles.trackRow}

@@ -16,7 +16,7 @@ export function Artwork({ artworkId, size, style }: Props) {
       <View
         style={[
           styles.fallback,
-          { width: size, height: size, borderRadius: size === 48 ? 8 : 12 },
+          size > 0 ? { width: size, height: size, borderRadius: size === 48 ? 8 : 12 } : {},
           style,
         ]}
       />
@@ -40,7 +40,7 @@ export function Artwork({ artworkId, size, style }: Props) {
 
 const styles = StyleSheet.create({
   fallback: {
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#141d38",
     alignItems: "center",
     justifyContent: "center",
   },

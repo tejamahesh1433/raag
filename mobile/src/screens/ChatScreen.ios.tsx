@@ -12,15 +12,27 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../api";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, Track } from "../types";
 import { usePlayer } from "../store/player";
 import { COLORS, FONT, RADIUS, SPACING } from "../theme/ios";
 
+function messageKey(item: ChatMessage): string {
+  return String(item.id);
+}
+
+function messageTime(item: ChatMessage): number {
+  const raw = item.created_at ?? item.timestamp;
+  const t = raw ? new Date(raw).getTime() : NaN;
+  return Number.isNaN(t) ? 0 : t;
+}
+
 export default function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [notices, setNotices] = useState<Record<string, string[]>>({});
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const currentTrack = usePlayer((s) => (s.index >= 0 ? s.queue[s.index] : null));
@@ -30,7 +42,7 @@ export default function ChatScreen() {
       .then((history) => {
         // newest-first for inverted FlatList
         const sorted = [...history].sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          (a, b) => messageTime(b) - messageTime(a),
         );
         setMessages(sorted);
       })
@@ -38,16 +50,22 @@ export default function ChatScreen() {
       .finally(() => setLoading(false));
   }, []);
 
+  function appendNotice(key: string, notice: string) {
+    setNotices((prev) => ({ ...prev, [key]: [...(prev[key] ?? []), notice] }));
+  }
+
   async function handleSend() {
     const text = input.trim();
     if (!text || sending) return;
     setInput("");
+    setError("");
 
+    const draftKey = `local-${Date.now()}`;
     const userMsg: ChatMessage = {
-      id: `local-${Date.now()}`,
+      id: draftKey,
       role: "user",
       content: text,
-      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
     setMessages((prev) => [userMsg, ...prev]);
 
@@ -56,20 +74,73 @@ export default function ChatScreen() {
       const nowPlaying = currentTrack
         ? { title: currentTrack.title, artist: currentTrack.artist }
         : undefined;
-      const response = await api.chat(text, nowPlaying);
-      setMessages((prev) => [response, ...prev]);
-    } catch {}
+      const pendingId = `stream-${Date.now()}`;
+      let started = false;
+      await api.streamChat(text, nowPlaying, (ev) => {
+        if (ev.event === "token") {
+          const piece = String((ev.data as { text?: unknown }).text ?? "");
+          setMessages((prev) => {
+            if (started) {
+              return prev.map((m) =>
+                String(m.id) === pendingId ? { ...m, content: m.content + piece } : m,
+              );
+            }
+            started = true;
+            return [
+              {
+                id: pendingId,
+                role: "assistant",
+                content: piece,
+                created_at: new Date().toISOString(),
+              } satisfies ChatMessage,
+              ...prev,
+            ];
+          });
+        } else if (ev.event === "action") {
+          const action = ev.data as unknown as {
+            type?: string;
+            mode?: string;
+            tracks?: Track[];
+            name?: string;
+          };
+          if (action.type === "play" && Array.isArray(action.tracks)) {
+            const player = usePlayer.getState();
+            if (action.mode === "queue") {
+              player.enqueue(action.tracks);
+              appendNotice(draftKey, `+ Queued ${action.tracks.length} track(s)`);
+            } else {
+              void player.playNow(action.tracks, 0);
+              appendNotice(draftKey, `▶ Playing ${action.tracks.length} track(s)`);
+            }
+          } else if (action.type === "playlist_created") {
+            appendNotice(draftKey, `Created playlist “${action.name ?? ""}”`);
+          }
+        } else if (ev.event === "error") {
+          setError(String((ev.data as { detail?: unknown }).detail ?? "AI error"));
+        }
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Chat failed");
+    }
     setSending(false);
   }
 
   function renderItem({ item }: { item: ChatMessage }) {
     const isUser = item.role === "user";
+    const extra = notices[String(item.id)] ?? [];
     return (
       <View style={[styles.bubbleRow, isUser ? styles.bubbleRowUser : styles.bubbleRowAssistant]}>
-        <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
-          <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant]}>
-            {item.content}
-          </Text>
+        <View style={styles.bubbleColumn}>
+          {extra.map((n) => (
+            <Text key={n} style={styles.noticeText}>
+              {n}
+            </Text>
+          ))}
+          <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
+            <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant]}>
+              {item.content}
+            </Text>
+          </View>
         </View>
       </View>
     );
@@ -87,13 +158,14 @@ export default function ChatScreen() {
           <FlatList
             ref={listRef}
             data={messages}
-            keyExtractor={(item) => item.id}
+            keyExtractor={messageKey}
             renderItem={renderItem}
             inverted
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           />
         )}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
         <SafeAreaView edges={["bottom"]} style={styles.inputContainer}>
           <View style={styles.inputRow}>
             <TextInput
@@ -158,6 +230,22 @@ const styles = StyleSheet.create({
   },
   bubbleRowAssistant: {
     justifyContent: "flex-start",
+  },
+  bubbleColumn: {
+    maxWidth: "78%",
+  },
+  noticeText: {
+    fontSize: 12,
+    color: COLORS.accent,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  errorText: {
+    fontSize: 12,
+    color: "#ff453a",
+    textAlign: "center",
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.xs,
   },
   bubble: {
     maxWidth: "78%",

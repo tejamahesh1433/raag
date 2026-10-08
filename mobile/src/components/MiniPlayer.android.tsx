@@ -27,7 +27,7 @@ export function MiniPlayer({ onExpand }: Props) {
       </View>
 
       <Pressable style={styles.content} onPress={onExpand}>
-        <Artwork artworkId={track.album_id} size={40} style={styles.artwork} />
+        <Artwork artworkId={track.artwork_id} size={40} style={styles.artwork} />
 
         <View style={styles.trackInfo}>
           <Text style={styles.title} numberOfLines={1}>
@@ -39,14 +39,14 @@ export function MiniPlayer({ onExpand }: Props) {
         </View>
 
         <TouchableOpacity
-          onPress={() => usePlayer.getState().prev()}
+          onPress={(e) => { e.stopPropagation(); usePlayer.getState().prev(); }}
           style={styles.iconBtn}
         >
           <MaterialIcons name="skip-previous" size={28} color={COLORS.onSurface} />
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => usePlayer.getState().toggle()}
+          onPress={(e) => { e.stopPropagation(); usePlayer.getState().toggle(); }}
           style={styles.iconBtn}
         >
           <MaterialIcons
@@ -57,7 +57,7 @@ export function MiniPlayer({ onExpand }: Props) {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => usePlayer.getState().next()}
+          onPress={(e) => { e.stopPropagation(); usePlayer.getState().next(); }}
           style={styles.iconBtn}
         >
           <MaterialIcons name="skip-next" size={28} color={COLORS.onSurface} />

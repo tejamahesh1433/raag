@@ -53,7 +53,7 @@ export default function FavoritesScreen() {
             </View>
           }
           renderItem={({ item, index }) => {
-            const artworkUri = api.artworkUrl(item.album_id);
+            const artworkUri = api.artworkUrl(item.artwork_id);
             const isPlaying = item.id === currentId;
             return (
               <TouchableOpacity

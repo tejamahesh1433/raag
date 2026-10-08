@@ -82,9 +82,9 @@ export function QueuePage() {
               <span className="w-6 shrink-0 select-none text-center text-xs tabular-nums text-muted">
                 {i + 1}
               </span>
-              {track.album_id ? (
+              {track.artwork_id ? (
                 <img
-                  src={api.artworkUrl(track.album_id)}
+                  src={api.artworkUrl(track.artwork_id)}
                   alt=""
                   className="h-10 w-10 shrink-0 rounded-lg object-cover"
                   onError={(e) => {

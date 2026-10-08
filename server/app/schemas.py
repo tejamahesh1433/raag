@@ -54,6 +54,7 @@ class TrackOut(BaseModel):
     added_at: datetime
     album_id: int | None
     artist_id: int | None
+    artwork_id: int | None = None
     is_favorite: bool = False
 
 

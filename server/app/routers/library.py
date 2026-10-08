@@ -23,6 +23,11 @@ def _cached_setting(db: DbSession, key: str) -> str | None:
     _SETTINGS_CACHE[key] = (value, time.monotonic())
     return value
 
+
+def invalidate_settings_cache() -> None:
+    """Call whenever any Setting row changes (PUT settings, DB reseed)."""
+    _SETTINGS_CACHE.clear()
+
 from ..deps import get_current_user, get_db
 from ..models import Album, Artist, Favorite, Job, PlayEvent, Setting, Track, User, utcnow
 from ..schemas import AlbumOut, ArtistOut, MessageOut, PageOut, SearchOut, TrackOut
@@ -33,7 +38,26 @@ router = APIRouter(prefix="/api", tags=["library"])
 
 
 # Serialization helpers --------------------------------------------------------
-def track_out(track: Track, favorite_ids: set[int] | None = None) -> TrackOut:
+def _artwork_map_for_tracks(db: DbSession, tracks: list[Track]) -> dict[int, int | None]:
+    album_ids = {t.album_id for t in tracks if t.album_id is not None}
+    if not album_ids:
+        return {}
+    rows = db.query(Album.id, Album.artwork_id).filter(Album.id.in_(album_ids)).all()
+    return {r[0]: r[1] for r in rows}
+
+
+def track_out(
+    track: Track,
+    favorite_ids: set[int] | None = None,
+    artwork_map: dict[int, int | None] | None = None,
+    db: DbSession | None = None,
+) -> TrackOut:
+    art_id = None
+    if artwork_map is not None:
+        art_id = artwork_map.get(track.album_id) if track.album_id else None
+    elif db is not None and track.album_id:
+        album_row = db.query(Album.artwork_id).filter(Album.id == track.album_id).first()
+        art_id = album_row[0] if album_row else None
     return TrackOut(
         id=track.id,
         title=track.title,
@@ -52,8 +76,16 @@ def track_out(track: Track, favorite_ids: set[int] | None = None) -> TrackOut:
         added_at=track.added_at,
         album_id=track.album_id,
         artist_id=track.artist_id,
+        artwork_id=art_id,
         is_favorite=track.id in (favorite_ids or set()),
     )
+
+
+def _tracks_to_out(db: DbSession, tracks: list[Track], favorite_ids: set[int] | None = None) -> list[TrackOut]:
+    if not tracks:
+        return []
+    art_map = _artwork_map_for_tracks(db, tracks)
+    return [track_out(t, favorite_ids, art_map) for t in tracks]
 
 
 def _favorite_ids(db: DbSession, user: User) -> set[int]:
@@ -195,7 +227,7 @@ def _folder_rel(path: str, roots: list[str]) -> str:
 def list_tracks(
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
-    order: str = Query("title", pattern="^(title|newest|plays|artist|album)$"),
+    order: str = Query("title", pattern="^(title|newest|added_desc|plays|artist|album)$"),
     album_id: int | None = None,
     artist_id: int | None = None,
     genre: str | None = None,
@@ -219,6 +251,9 @@ def list_tracks(
             if _folder_rel(path, roots) == folder_norm
         ]
         query = db.query(Track).filter(Track.id.in_(ids if ids else [-1]))
+    # Mobile clients use order=added_desc; treat it as newest-first.
+    if order == "added_desc":
+        order = "newest"
     total = query.count()
     order_by = {
         "title": (Track.title.asc(),),
@@ -230,7 +265,7 @@ def list_tracks(
     rows = query.order_by(*order_by).offset(offset).limit(limit).all()
     favs = _favorite_ids(db, user)
     return PageOut(
-        items=[track_out(t, favs) for t in rows], total=total, offset=offset, limit=limit
+        items=_tracks_to_out(db, rows, favs), total=total, offset=offset, limit=limit
     )
 
 
@@ -317,7 +352,7 @@ def album_tracks(
         .all()
     )
     favs = _favorite_ids(db, user)
-    return [track_out(t, favs) for t in rows]
+    return _tracks_to_out(db, rows, favs)
 
 
 @router.get("/library/genres", response_model=list[dict])
@@ -391,7 +426,7 @@ def search(
         db.query(Album).filter(Album.title.ilike(like)).order_by(Album.title.asc()).limit(20).all()
     )
     return SearchOut(
-        tracks=[track_out(t, favs) for t in tracks],
+        tracks=_tracks_to_out(db, tracks, favs),
         artists=_artists_out_bulk(db, artists),
         albums=_albums_out_bulk(db, albums),
     )
@@ -407,7 +442,7 @@ def get_track(
     track = db.query(Track).filter(Track.id == track_id).first()
     if track is None:
         raise HTTPException(status_code=404, detail="Track not found")
-    return track_out(track, _favorite_ids(db, user))
+    return track_out(track, _favorite_ids(db, user), db=db)
 
 
 @router.get("/tracks/{track_id}/stream")
@@ -492,7 +527,7 @@ def add_favorite(
     if exists is None:
         db.add(Favorite(user_id=user.id, track_id=track_id))
         db.commit()
-    return track_out(track, _favorite_ids(db, user))
+    return track_out(track, _favorite_ids(db, user), db=db)
 
 
 @router.delete("/tracks/{track_id}/favorite", response_model=TrackOut)
@@ -508,7 +543,7 @@ def remove_favorite(
         Favorite.user_id == user.id, Favorite.track_id == track_id
     ).delete()
     db.commit()
-    return track_out(track, _favorite_ids(db, user))
+    return track_out(track, _favorite_ids(db, user), db=db)
 
 
 @router.get("/me/favorites", response_model=list[TrackOut])
@@ -524,7 +559,7 @@ def list_favorites(
         .all()
     )
     favs = _favorite_ids(db, user)
-    return [track_out(t, favs) for t in rows]
+    return _tracks_to_out(db, rows, favs)
 
 
 @router.post("/tracks/{track_id}/played", response_model=MessageOut)
@@ -571,4 +606,4 @@ def play_history(
         .all()
     )
     favs = _favorite_ids(db, user)
-    return [track_out(t, favs) for t in rows]
+    return _tracks_to_out(db, rows, favs)

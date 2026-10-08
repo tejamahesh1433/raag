@@ -15,7 +15,7 @@ from ..schemas import TrackOut
 from ..services import duplicates as dup_svc
 from ..services import enrichment as enrich_svc
 from ..services import tagging as tag_svc
-from .library import _favorite_ids, track_out
+from .library import _artwork_map_for_tracks, _favorite_ids, track_out
 
 router = APIRouter(prefix="/api/organization", tags=["organization"])
 
@@ -68,6 +68,7 @@ def list_suggestions(
         t.id: t for t in db.query(Track).filter(Track.id.in_(track_ids)).all()
     }
     favs = _favorite_ids(db, user)
+    art_map = _artwork_map_for_tracks(db, list(tracks_by_id.values()))
     result = []
     for r in rows:
         track = tracks_by_id.get(r.track_id)
@@ -79,7 +80,7 @@ def list_suggestions(
             original=json.loads(r.original or "{}"),
             rationale=r.rationale or "",
             created_at=r.created_at,
-            track=track_out(track, favs) if track else None,
+            track=track_out(track, favs, art_map) if track else None,
         ))
     return result
 

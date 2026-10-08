@@ -76,7 +76,7 @@ export function TrackList({
         {tracks.map((track, i) => {
           const isCurrent = currentTrack?.id === track.id;
           const artId =
-            track.album_id && artworkByAlbumId ? artworkByAlbumId[track.album_id] ?? null : null;
+            track.artwork_id ?? (track.album_id && artworkByAlbumId ? artworkByAlbumId[track.album_id] ?? null : null);
 
           return (
             <div

@@ -18,7 +18,7 @@ export default function MiniPlayer({ onExpand }: Props) {
   if (!track) return null;
 
   const progress = duration > 0 ? position / duration : 0;
-  const artworkUri = api.artworkUrl(track.album_id);
+  const artworkUri = api.artworkUrl(track.artwork_id);
 
   return (
     <View style={styles.wrapper}>

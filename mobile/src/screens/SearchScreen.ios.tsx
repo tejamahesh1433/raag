@@ -75,7 +75,7 @@ export default function SearchScreen({ navigation }: Props) {
   }
 
   function renderTrackRow(track: Track, idx: number, list: Track[]) {
-    const uri = api.artworkUrl(track.album_id);
+    const uri = api.artworkUrl(track.artwork_id);
     return (
       <TouchableOpacity
         key={track.id}

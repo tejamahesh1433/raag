@@ -16,6 +16,7 @@ export interface Track {
   added_at: string;
   album_id: number | null;
   artist_id: number | null;
+  artwork_id?: number | null;
   is_favorite: boolean;
 }
 

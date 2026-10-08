@@ -122,6 +122,15 @@ def _seed_settings() -> None:
                 s.add(Setting(key=key, value=json.dumps(value)))
         # Never clobber runtime-managed values, only fill missing defaults.
         s.commit()
+    # Reseed (fresh boot / test reset) must not serve stale cached settings.
+    try:
+        from .routers import discovery as _discovery
+        from .routers import library as _library
+
+        _library.invalidate_settings_cache()
+        _discovery.invalidate_ai_cfg_cache()
+    except ImportError:  # pragma: no cover - routers not loaded yet
+        pass
 
 
 @contextmanager

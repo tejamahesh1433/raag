@@ -9,8 +9,9 @@ import type { Playlist, RuleTree } from "../types";
 export function PlaylistsPage() {
   const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [kind, setKind] = useState<"manual" | "smart">("manual");
+  const [kind, setKind] = useState<"manual" | "smart" | "ai">("manual");
   const [newName, setNewName] = useState("");
+  const [aiDescription, setAiDescription] = useState("");
   const [ruleTree, setRuleTree] = useState<RuleTree>(EMPTY_RULE_TREE);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -23,10 +24,26 @@ export function PlaylistsPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim()) return;
+    if (kind !== "ai" && !newName.trim()) return;
     setCreating(true);
     setError("");
     try {
+      if (kind === "ai") {
+        if (aiDescription.trim().length < 3) {
+          setError("Describe the mix you want (e.g. “rainy evening jazz”).");
+          return;
+        }
+        const pl = await api.generateAiPlaylist({
+          description: aiDescription.trim(),
+          name: newName.trim() || undefined,
+        });
+        setNewName("");
+        setAiDescription("");
+        setKind("manual");
+        await load();
+        navigate(`/playlists/${pl.id}`);
+        return;
+      }
       if (kind === "smart") {
         const filled = ruleTree.rules.filter((r) =>
           typeof r.value === "number" || String(r.value).trim() !== "",
@@ -85,12 +102,15 @@ export function PlaylistsPage() {
               options={[
                 { id: "manual", label: "Manual" },
                 { id: "smart", label: "Smart" },
+                { id: "ai", label: "AI mix" },
               ]}
             />
             <span className="text-xs text-muted">
               {kind === "smart"
                 ? "Rule-based · updates automatically"
-                : "Hand-curated playlist"}
+                : kind === "ai"
+                  ? "Describe a mood — your local AI picks the tracks"
+                  : "Hand-curated playlist"}
             </span>
           </div>
 
@@ -98,12 +118,24 @@ export function PlaylistsPage() {
             <div className="flex gap-2">
               <input
                 className="input"
-                placeholder={kind === "smart" ? "Smart playlist name…" : "New playlist name…"}
+                placeholder={
+                  kind === "smart"
+                    ? "Smart playlist name…"
+                    : kind === "ai"
+                      ? "Mix name (optional)…"
+                      : "New playlist name…"
+                }
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
               <button className="btn btn-primary shrink-0" disabled={creating}>
-                {kind === "smart" ? "Create smart" : "Create"}
+                {creating && kind === "ai"
+                  ? "Thinking…"
+                  : kind === "smart"
+                    ? "Create smart"
+                    : kind === "ai"
+                      ? "✨ Generate"
+                      : "Create"}
               </button>
               {kind === "manual" && (
                 <button
@@ -116,6 +148,15 @@ export function PlaylistsPage() {
                 </button>
               )}
             </div>
+
+            {kind === "ai" && (
+              <textarea
+                className="input h-20"
+                placeholder="Describe the mix… e.g. “upbeat songs for a night drive”"
+                value={aiDescription}
+                onChange={(e) => setAiDescription(e.target.value)}
+              />
+            )}
 
             {kind === "smart" && (
               <SmartPlaylistBuilder value={ruleTree} onChange={setRuleTree} />
@@ -145,7 +186,7 @@ export function PlaylistsPage() {
               className="flex items-center gap-4 px-3 py-4 transition-colors hover:bg-panel/50"
             >
               <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-border-subtle bg-panel-2 text-accent">
-                {pl.kind === "smart" ? <IconSpark size={20} /> : <IconPlaylist size={20} />}
+                {pl.kind !== "manual" ? <IconSpark size={20} /> : <IconPlaylist size={20} />}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{pl.name}</div>

@@ -52,7 +52,7 @@ export function FavoritesScreen() {
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={() => usePlayer.getState().playNow(favorites, index)}
         >
-          <Artwork artworkId={item.album_id} size={48} />
+          <Artwork artworkId={item.artwork_id} size={48} />
           <View style={styles.info}>
             <Text
               style={[styles.title, item.id === currentId && styles.titlePlaying]}

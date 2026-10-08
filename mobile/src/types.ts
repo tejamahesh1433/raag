@@ -16,6 +16,7 @@ export interface Track {
   added_at: string;
   album_id: number | null;
   artist_id: number | null;
+  artwork_id?: number | null;
   is_favorite: boolean;
 }
 
@@ -62,8 +63,13 @@ export interface SearchResults {
 }
 
 export interface ChatMessage {
-  id: string;
+  id: number | string;
   role: "user" | "assistant";
   content: string;
-  timestamp: string;
+  /** Server timestamp when present; local fallback for optimistic messages. */
+  created_at?: string;
+  /** @deprecated — use created_at; kept for older persisted rows. */
+  timestamp?: string;
+  /** Tool/action summaries streamed back by the assistant (web parity). */
+  actions?: Array<Record<string, unknown>>;
 }

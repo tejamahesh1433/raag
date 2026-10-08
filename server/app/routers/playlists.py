@@ -1,8 +1,10 @@
-"""Playlists: manual CRUD, track management, smart rules, M3U export/import."""
+"""Playlists: manual CRUD, track management, smart rules, M3U export/import, AI mixes."""
 import json
+import re
 from pathlib import Path as FSPath
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
@@ -60,6 +62,157 @@ def _get_owned(db: DbSession, playlist_id: int, user: User) -> Playlist:
     if playlist.owner_id != user.id and not user.is_admin:
         raise HTTPException(status_code=403, detail="Not your playlist")
     return playlist
+
+
+# --- AI playlist generation (spec stories #25/#26/#28) -----------------------
+class AiGenerateIn(BaseModel):
+    description: str = Field(min_length=1, max_length=500)
+    name: str | None = Field(default=None, max_length=256)
+    limit: int = Field(default=20, ge=3, le=50)
+
+
+def _extract_json(raw: str) -> dict:
+    text = raw.strip()
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+    if fence:
+        text = fence.group(1).strip()
+    brace = re.search(r"\{.*\}", text, re.DOTALL)
+    if brace:
+        text = brace.group(0)
+    try:
+        data = json.loads(text)
+        return data if isinstance(data, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+_STOPWORDS = {
+    "a", "an", "the", "of", "for", "to", "and", "with", "some", "me", "my",
+    "play", "songs", "song", "tracks", "track", "music", "make", "please",
+    "playlist", "mix", "like", "get", "want", "give", "something", "kind",
+}
+
+
+def _keyword_fallback(candidates: list[dict], description: str, limit: int) -> list[int]:
+    """Deterministic keyword scoring when the model gives nothing usable."""
+    tokens = [
+        t for t in re.findall(r"[\w']+", description.lower())
+        if len(t) > 2 and t not in _STOPWORDS
+    ]
+    scored: list[tuple[int, int]] = []
+    for cand in candidates:
+        haystack = " ".join(
+            str(cand.get(k) or "") for k in ("title", "artist", "album", "genre")
+        ).lower()
+        score = sum(
+            (3 if tok in str(cand.get("genre") or "").lower() else 0)
+            + (2 if tok in str(cand.get("artist") or "").lower() else 0)
+            + (1 if tok in haystack else 0)
+            for tok in tokens
+        )
+        scored.append((score, cand["id"]))
+    scored.sort(key=lambda pair: (-pair[0], pair[1]))
+    picked = [cid for score, cid in scored[:limit] if score > 0]
+    if not picked:  # nothing matched — fall back to most played
+        picked = [c["id"] for c in candidates[:limit]]
+    return picked
+
+
+@router.post("/ai/generate", response_model=PlaylistOut, status_code=201)
+def generate_ai_playlist(
+    payload: AiGenerateIn,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Build a playlist from a natural-language description via the local LLM.
+
+    Selection is validated against real library ids; if the model returns
+    nothing usable, a keyword-based fallback keeps the feature dependable.
+    """
+    from ..ai import gateway
+    from ..models import Setting
+
+    row = db.query(Setting).filter(Setting.key == "ai").first()
+    ai_cfg: dict = {}
+    if row and row.value:
+        try:
+            ai_cfg = json.loads(row.value)
+        except json.JSONDecodeError:
+            ai_cfg = {}
+    if not gateway.check_reachable(ai_cfg, timeout=3.0):
+        raise HTTPException(
+            status_code=503,
+            detail="AI provider unreachable — start Ollama or LM Studio.",
+        )
+
+    limit = payload.limit
+    candidates_rows = (
+        db.query(Track).order_by(Track.play_count.desc(), Track.title.asc()).limit(300).all()
+    )
+    candidates = [
+        {
+            "id": t.id,
+            "title": t.title,
+            "artist": t.artist_name,
+            "album": t.album_title,
+            "genre": t.genre,
+            "year": t.year,
+        }
+        for t in candidates_rows
+    ]
+    if not candidates:
+        raise HTTPException(status_code=400, detail="Library is empty")
+
+    prompt = (
+        "Pick tracks for a playlist from the candidate list (JSON) below.\n"
+        f"Request: {payload.description!r}\n"
+        f"Return at most {limit} track ids.\n"
+        "Reply with ONLY JSON: {\"track_ids\": [ids...], \"rationale\": \"one short sentence\"}\n"
+        "Only use ids from the candidate list. Never invent ids.\n\n"
+        f"Candidates: {json.dumps(candidates, ensure_ascii=False)}"
+    )
+    try:
+        resp = gateway.chat_once(
+            ai_cfg, [{"role": "user", "content": prompt}], tools=None
+        )
+        data = _extract_json(gateway.extract_text(resp))
+    except gateway.ProviderUnavailable as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    valid_ids = {c["id"] for c in candidates}
+    chosen: list[int] = []
+    for raw_id in data.get("track_ids") or []:
+        try:
+            tid = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if tid in valid_ids and tid not in chosen:
+            chosen.append(tid)
+        if len(chosen) >= limit:
+            break
+    rationale = str(data.get("rationale") or "").strip()
+    used_fallback = False
+    if not chosen:
+        chosen = _keyword_fallback(candidates, payload.description, limit)
+        used_fallback = True
+        if not rationale:
+            rationale = "Keyword-based selection (model returned no usable ids)."
+
+    name = (payload.name or "").strip() or "AI Mix"
+    playlist = Playlist(
+        name=name,
+        description=f"{rationale}" + (" (keyword fallback)" if used_fallback else ""),
+        kind="ai",
+        rules="",  # materialized rows; rules stay empty so it stays editable
+        owner_id=user.id,
+    )
+    db.add(playlist)
+    db.flush()
+    for pos, tid in enumerate(chosen):
+        db.add(PlaylistTrack(playlist_id=playlist.id, track_id=tid, position=pos))
+    db.commit()
+    db.refresh(playlist)
+    return _playlist_out(db, playlist)
 
 
 @router.get("", response_model=list[PlaylistOut])
@@ -230,7 +383,7 @@ def playlist_tracks(
     db: DbSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    from ..routers.library import _favorite_ids, track_out
+    from ..routers.library import _favorite_ids, _tracks_to_out
 
     playlist = _get_owned(db, playlist_id, user)
     if playlist.kind in ("smart", "ai") and playlist.rules:
@@ -244,7 +397,7 @@ def playlist_tracks(
             .all()
         )
     favs = _favorite_ids(db, user)
-    return [track_out(t, favs) for t in rows]
+    return _tracks_to_out(db, rows, favs)
 
 
 @router.patch("/{playlist_id}", response_model=PlaylistOut)

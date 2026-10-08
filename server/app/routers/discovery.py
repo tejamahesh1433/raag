@@ -16,7 +16,7 @@ from ..models import Job, Setting, Track, User
 from ..schemas import TrackOut
 from ..services import embeddings as emb
 from ..services.lyrics import resolve_lyrics
-from .library import _favorite_ids, track_out
+from .library import _artwork_map_for_tracks, _favorite_ids, _tracks_to_out, track_out
 
 router = APIRouter(prefix="/api", tags=["discovery"])
 
@@ -57,6 +57,12 @@ def _ai_cfg(db: DbSession) -> dict:
             pass
     _AI_CFG_CACHE = (value, now)
     return value
+
+
+def invalidate_ai_cfg_cache() -> None:
+    """Call whenever the `ai` Setting row changes (PUT settings, DB reseed)."""
+    global _AI_CFG_CACHE
+    _AI_CFG_CACHE = None
 
 
 def _embed_model(db: DbSession) -> str:
@@ -122,11 +128,12 @@ def similar(
     favs = _favorite_ids(db, user)
     ids = [tid for tid, _ in scored]
     rows = {t.id: t for t in db.query(Track).filter(Track.id.in_(ids)).all()}
+    art_map = _artwork_map_for_tracks(db, list(rows.values()))
     out: list[SimilarOut] = []
     for tid, score in scored:
         row = rows.get(tid)
         if row:
-            out.append(SimilarOut(track=track_out(row, favs), score=round(score, 4)))
+            out.append(SimilarOut(track=track_out(row, favs, art_map), score=round(score, 4)))
     return out
 
 
@@ -153,11 +160,12 @@ def semantic_search(
     favs = _favorite_ids(db, user)
     ids = [tid for tid, _ in scored]
     rows = {t.id: t for t in db.query(Track).filter(Track.id.in_(ids)).all()}
+    art_map = _artwork_map_for_tracks(db, list(rows.values()))
     out: list[SimilarOut] = []
     for tid, score in scored:
         row = rows.get(tid)
         if row:
-            out.append(SimilarOut(track=track_out(row, favs), score=round(score, 4)))
+            out.append(SimilarOut(track=track_out(row, favs, art_map), score=round(score, 4)))
     return out
 
 
@@ -233,8 +241,7 @@ def generate_radio(
         fallback_tracks = q.limit(needed).all()
         results.extend(fallback_tracks)
 
-    out = [track_out(seed, favs)] + [track_out(t, favs) for t in results]
-    return out
+    return _tracks_to_out(db, [seed] + results, favs)
 
 
 class StatsOut(BaseModel):

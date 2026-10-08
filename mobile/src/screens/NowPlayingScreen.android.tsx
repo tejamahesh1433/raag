@@ -165,7 +165,7 @@ export function NowPlayingScreen({ navigation }: Props) {
   const [showQueue, setShowQueue] = useState(false);
 
   const track = index >= 0 ? queue[index] : null;
-  const artworkUri = track ? api.artworkUrl(track.album_id) : null;
+  const artworkUri = track ? api.artworkUrl(track.artwork_id) : null;
 
   const repeatColor = repeat !== "none" ? COLORS.accent : COLORS.muted;
   const shuffleColor = shuffle ? COLORS.accent : COLORS.muted;
@@ -181,10 +181,15 @@ export function NowPlayingScreen({ navigation }: Props) {
       <View style={[StyleSheet.absoluteFill, styles.overlay]} />
 
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-        {/* Drag handle */}
-        <View style={styles.handleRow}>
+        {/* Drag handle — tap anywhere in this row to dismiss */}
+        <TouchableOpacity
+          style={styles.handleRow}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.6}
+          hitSlop={{ top: 10, bottom: 10, left: 60, right: 60 }}
+        >
           <View style={styles.handle} />
-        </View>
+        </TouchableOpacity>
 
         {/* Artwork - Material 3 large */}
         <View style={styles.artworkSection}>
@@ -257,7 +262,7 @@ export function NowPlayingScreen({ navigation }: Props) {
           <ScrollView style={styles.queueList} showsVerticalScrollIndicator={false}>
             {queue.slice(index + 1, index + 20).map((t, offset) => {
               const actualIdx = index + 1 + offset;
-              const uri = api.artworkUrl(t.album_id);
+              const uri = api.artworkUrl(t.artwork_id);
               return (
                 <TouchableOpacity
                   key={`${t.id}-${actualIdx}`}

@@ -145,6 +145,11 @@ export const api = {
   playlists: () => request<Playlist[]>("/api/playlists"),
   playlist: (id: number) => request<Playlist>(`/api/playlists/${id}`),
   playlistTracks: (id: number) => request<Track[]>(`/api/playlists/${id}/tracks`),
+  generateAiPlaylist: (payload: { description: string; name?: string; limit?: number }) =>
+    request<Playlist>("/api/playlists/ai/generate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   createPlaylist: (payload: {
     name: string;
     description?: string;

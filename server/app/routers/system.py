@@ -38,6 +38,12 @@ def _upsert_setting(db: DbSession, key: str, value) -> None:
         setting = Setting(key=key)
         db.add(setting)
     setting.value = json.dumps(value)
+    # Settings changed on disk -> drop in-process caches so reads are fresh.
+    from . import discovery as _discovery
+    from . import library as _library
+
+    _library.invalidate_settings_cache()
+    _discovery.invalidate_ai_cfg_cache()
 
 
 _SETTINGS_KEYS = {"library_roots", "ai", "scan_interval_hours", "transcode_enabled", "scrobble", "discord", "acoustid"}

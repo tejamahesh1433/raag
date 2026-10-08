@@ -52,6 +52,19 @@ def test_rescan_removes_deleted_files(auth_client, tmp_path):
     assert auth_client.get("/api/health").json()["tracks"] == 4
 
 
+def test_order_added_desc_alias_means_newest(auth_client, tmp_path):
+    """Mobile clients request order=added_desc; it must behave like newest."""
+    build_library(tmp_path)
+    configure_and_scan(auth_client, tmp_path)
+    newest = auth_client.get(
+        "/api/library/tracks", params={"order": "newest", "limit": 100}
+    ).json()
+    via_alias = auth_client.get(
+        "/api/library/tracks", params={"order": "added_desc", "limit": 100}
+    ).json()
+    assert [t["id"] for t in via_alias["items"]] == [t["id"] for t in newest["items"]]
+
+
 def test_scan_skips_duplicate_copies_across_roots(auth_client, tmp_path):
     """Same tagged song in two folders must only appear once in the library."""
     from conftest import make_wav
