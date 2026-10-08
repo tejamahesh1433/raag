@@ -64,7 +64,6 @@ async function _playTrack(track: Track): Promise<void> {
     usePlayer.setState({
       position: status.currentTime,
       duration: status.duration,
-      playing: status.playing,
       loading: status.isBuffering,
     });
     if (status.didJustFinish) {
