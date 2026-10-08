@@ -97,13 +97,20 @@ def _mount_spa(app: FastAPI) -> None:
     if (WEB_DIST / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
 
-    # Serve downloadable app builds (APK etc.) from the persistent data volume.
     downloads_dir = config.DATA_DIR / "downloads"
     downloads_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/downloads", StaticFiles(directory=downloads_dir), name="downloads")
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa_fallback(path: str):
+        # Downloads are served from the persistent data volume, not web/dist.
+        # Handle this here because app.mount() loses the race against /{path:path}.
+        if path.startswith("downloads/"):
+            filename = path[len("downloads/"):]
+            dl_file = (downloads_dir / filename).resolve()
+            if dl_file.is_relative_to(downloads_dir) and dl_file.is_file():
+                return FileResponse(dl_file, filename=filename)
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="File not found")
         if path.startswith("api/"):
             return FileResponse(WEB_DIST / "index.html")  # unknown API route -> SPA
         target = (WEB_DIST / path).resolve()
