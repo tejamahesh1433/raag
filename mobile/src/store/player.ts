@@ -34,11 +34,13 @@ interface PlayerState {
   cycleRepeat: () => void;
   toggleFavorite: (trackId: number) => void;
   removeFromQueue: (index: number) => void;
+  stop: () => void;
 }
 
 async function _stopCurrent(): Promise<void> {
   if (_sound) {
     try {
+      _sound.clearLockScreenControls();
       _sound.pause();
       _sound.remove();
     } catch {}
@@ -59,6 +61,19 @@ async function _playTrack(track: Track): Promise<void> {
     } catch {}
   }
   const sound = createAudioPlayer(api.streamSource(track.id), { updateInterval: 500 });
+  const repeatMode = usePlayer.getState().repeat;
+  sound.loop = repeatMode === "one";
+
+  try {
+    const artworkUrl = api.artworkUrl(track.artwork_id) ?? undefined;
+    sound.setActiveForLockScreen(true, {
+      title: track.title,
+      artist: track.artist,
+      albumTitle: track.album,
+      artworkUrl,
+    });
+  } catch {}
+
   sound.addListener("playbackStatusUpdate", (status: AudioStatus) => {
     if (!status.isLoaded) return;
     usePlayer.setState({
@@ -67,7 +82,9 @@ async function _playTrack(track: Track): Promise<void> {
       loading: status.isBuffering,
     });
     if (status.didJustFinish) {
-      usePlayer.getState().next();
+      if (usePlayer.getState().repeat !== "one") {
+        usePlayer.getState().next();
+      }
     }
   });
   _sound = sound;
@@ -121,22 +138,36 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       await _playTrack(queue[index]);
       return;
     }
-    let next = shuffle ? Math.floor(Math.random() * queue.length) : index + 1;
-    if (next >= queue.length) {
-      if (repeat === "all") next = 0;
+    let nextIdx: number;
+    if (shuffle && queue.length > 1) {
+      const pool = queue.map((_, i) => i).filter((i) => i !== index);
+      nextIdx = pool[Math.floor(Math.random() * pool.length)];
+    } else {
+      nextIdx = index + 1;
+    }
+    if (nextIdx >= queue.length) {
+      if (repeat === "all") nextIdx = 0;
       else { set({ playing: false }); return; }
     }
-    set({ index: next, loading: true, position: 0 });
-    await _playTrack(queue[next]);
+    set({ index: nextIdx, loading: true, position: 0 });
+    await _playTrack(queue[nextIdx]);
   },
 
   prev: async () => {
-    const { queue, index, position } = get();
+    const { queue, index, position, repeat } = get();
     if (!queue.length) return;
-    if (position > 3) { await _sound?.seekTo(0); return; }
-    const prev = Math.max(0, index - 1);
-    set({ index: prev, loading: true, position: 0 });
-    await _playTrack(queue[prev]);
+    if (position > 3) {
+      await _sound?.seekTo(0);
+      set({ position: 0 });
+      return;
+    }
+    let prevIdx = index - 1;
+    if (prevIdx < 0) {
+      if (repeat === "all") prevIdx = queue.length - 1;
+      else prevIdx = 0;
+    }
+    set({ index: prevIdx, loading: true, position: 0 });
+    await _playTrack(queue[prevIdx]);
   },
 
   jumpTo: async (idx) => {
@@ -153,9 +184,14 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   toggleShuffle: () => set((s) => ({ shuffle: !s.shuffle })),
 
-  cycleRepeat: () => set((s) => ({
-    repeat: s.repeat === "none" ? "all" : s.repeat === "all" ? "one" : "none",
-  })),
+  cycleRepeat: () => {
+    const nextRepeat: RepeatMode =
+      get().repeat === "none" ? "all" : get().repeat === "all" ? "one" : "none";
+    if (_sound) {
+      _sound.loop = nextRepeat === "one";
+    }
+    set({ repeat: nextRepeat });
+  },
 
   toggleFavorite: (trackId) => {
     const { queue } = get();
@@ -169,9 +205,26 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     set({ queue: queue.map((t) => t.id === trackId ? { ...t, is_favorite: !t.is_favorite } : t) });
   },
 
+  stop: () => {
+    _stopCurrent();
+    set({ queue: [], index: -1, playing: false, loading: false, position: 0, duration: 0 });
+  },
+
   removeFromQueue: (idx) => {
     const { queue, index } = get();
-    const next = queue.filter((_, i) => i !== idx);
-    set({ queue: next, index: idx < index ? index - 1 : idx === index ? Math.min(index, next.length - 1) : index });
+    const nextQueue = queue.filter((_, i) => i !== idx);
+    if (!nextQueue.length) {
+      _stopCurrent();
+      set({ queue: [], index: -1, playing: false, position: 0, duration: 0 });
+      return;
+    }
+    if (idx === index) {
+      const newIdx = Math.min(index, nextQueue.length - 1);
+      set({ queue: nextQueue, index: newIdx, position: 0 });
+      _playTrack(nextQueue[newIdx]);
+    } else {
+      const newIdx = idx < index ? index - 1 : index;
+      set({ queue: nextQueue, index: newIdx });
+    }
   },
 }));

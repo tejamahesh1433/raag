@@ -1,5 +1,7 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  Animated,
+  Dimensions,
   PanResponder,
   ScrollView,
   StyleSheet,
@@ -170,10 +172,48 @@ export function NowPlayingScreen({ navigation }: Props) {
   const repeatColor = repeat !== "none" ? COLORS.accent : COLORS.muted;
   const shuffleColor = shuffle ? COLORS.accent : COLORS.muted;
 
+  // Swipe down anywhere to minimize. Children (scrubber, queue list) get first
+  // claim on touches; we only take over clear downward vertical drags.
+  const translateY = useRef(new Animated.Value(0)).current;
+  const navRef = useRef(navigation);
+  navRef.current = navigation;
+
+  const dismissPan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) =>
+        g.dy > 10 && g.dy > Math.abs(g.dx) * 1.5,
+      onPanResponderMove: (_e, g) => {
+        translateY.setValue(Math.max(0, g.dy));
+      },
+      onPanResponderRelease: (_e, g) => {
+        if (g.dy > 120 || g.vy > 0.8) {
+          Animated.timing(translateY, {
+            toValue: Dimensions.get("window").height,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => navRef.current.goBack());
+        } else {
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+      },
+    })
+  ).current;
+
+  // Queue was cleared while this screen is open: don't leave a blank modal.
+  useEffect(() => {
+    if (!track && navigation.canGoBack()) navigation.goBack();
+  }, [track, navigation]);
+
   if (!track) return null;
 
   return (
-    <View style={styles.container}>
+    <Animated.View
+      style={[styles.container, { transform: [{ translateY }] }]}
+      {...dismissPan.panHandlers}
+    >
       {artworkUri && (
         <Image source={{ uri: artworkUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
       )}
@@ -181,15 +221,25 @@ export function NowPlayingScreen({ navigation }: Props) {
       <View style={[StyleSheet.absoluteFill, styles.overlay]} />
 
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-        {/* Drag handle — tap anywhere in this row to dismiss */}
-        <TouchableOpacity
-          style={styles.handleRow}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.6}
-          hitSlop={{ top: 10, bottom: 10, left: 60, right: 60 }}
-        >
-          <View style={styles.handle} />
-        </TouchableOpacity>
+        {/* Drag handle / close */}
+        <View style={styles.handleRow}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.6}
+            hitSlop={{ top: 10, bottom: 10, left: 60, right: 60 }}
+            accessibilityLabel="Close player"
+          >
+            <View style={styles.handle} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Close player"
+          >
+            <MaterialIcons name="keyboard-arrow-down" size={32} color={COLORS.onBg} />
+          </TouchableOpacity>
+        </View>
 
         {/* Artwork - Material 3 large */}
         <View style={styles.artworkSection}>
@@ -285,7 +335,7 @@ export function NowPlayingScreen({ navigation }: Props) {
           </ScrollView>
         )}
       </SafeAreaView>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -304,6 +354,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: SPACING.sm,
     paddingBottom: SPACING.xs,
+  },
+  closeBtn: {
+    position: "absolute",
+    left: SPACING.lg,
+    top: SPACING.xs,
   },
   handle: {
     width: 40,
