@@ -10,6 +10,8 @@ const BASE_URL_KEY = "raag_base_url";
 const COOKIE_KEY = "raag_session_cookie";
 const QUALITY_KEY = "raag_stream_quality";
 
+export const DEFAULT_SERVER_URL = "http://192.168.4.43:8765";
+
 export type StreamQuality = "original" | "high" | "medium" | "low";
 
 let _baseUrl = "";
@@ -22,7 +24,7 @@ export async function initApi(): Promise<void> {
     SecureStore.getItemAsync(COOKIE_KEY),
     AsyncStorage.getItem(QUALITY_KEY),
   ]);
-  _baseUrl = baseUrl ?? "";
+  _baseUrl = baseUrl ?? DEFAULT_SERVER_URL;
   _cookie = cookie ?? "";
   if (quality === "original" || quality === "high" || quality === "medium" || quality === "low") {
     _streamQuality = quality;

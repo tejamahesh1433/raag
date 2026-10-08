@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, clearSession, getBaseUrl, setBaseUrl } from "../api";
+import { api, clearSession, getBaseUrl, setBaseUrl, DEFAULT_SERVER_URL } from "../api";
 import type { User } from "../types";
 
 interface AuthState {
@@ -43,15 +43,15 @@ export const useAuth = create<AuthState>((set) => ({
 
   restore: async () => {
     set({ loading: true });
+    // Ensure a base URL is always set so open-access servers work without login.
+    if (!getBaseUrl()) await setBaseUrl(DEFAULT_SERVER_URL);
     try {
-      if (!api.me || !getBaseUrl()) {
-        set({ user: null, loading: false });
-        return;
-      }
       const user = await api.me();
       set({ user, loading: false });
     } catch {
-      set({ user: null, loading: false });
+      // Open-access mode: server is reachable but returns no user — treat as guest.
+      const guest: User = { id: 0, username: "guest", is_admin: false };
+      set({ user: guest, loading: false });
     }
   },
 }));
