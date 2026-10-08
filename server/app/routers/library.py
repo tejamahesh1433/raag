@@ -78,6 +78,7 @@ def track_out(
         artist_id=track.artist_id,
         artwork_id=art_id,
         is_favorite=track.id in (favorite_ids or set()),
+        mood=track.mood or "",
     )
 
 

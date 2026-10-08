@@ -56,6 +56,7 @@ class TrackOut(BaseModel):
     artist_id: int | None
     artwork_id: int | None = None
     is_favorite: bool = False
+    mood: str = ""
 
 
 class ArtistOut(BaseModel):

@@ -100,7 +100,7 @@ def fetch_tracks(server: str) -> list[dict]:
         if len(all_tracks) >= data["total"]:
             break
         offset += 200
-    print(f"  → {len(all_tracks)} tracks")
+    print(f"  -> {len(all_tracks)} tracks")
     return all_tracks
 
 
@@ -153,7 +153,7 @@ def train_classifier(
     le = LabelEncoder()
     y = le.fit_transform(labels)
 
-    clf = LogisticRegression(max_iter=1000, C=2.0, solver="lbfgs", multi_class="auto")
+    clf = LogisticRegression(max_iter=1000, C=2.0, solver="lbfgs")
 
     # Cross-validate on available data
     n_splits = min(5, Counter(labels).most_common()[-1][1])  # at most as many folds as rarest class
@@ -200,7 +200,7 @@ def save_model(
     (output_dir / "config.json").write_text(
         json.dumps({"embedding_model": embedding_model_name, "moods": MOODS}, indent=2)
     )
-    print(f"  Model saved → {output_dir}")
+    print(f"  Model saved -> {output_dir}")
 
 
 def main() -> None:
@@ -253,7 +253,7 @@ def main() -> None:
         print()
         upload_moods(args.server, mood_map)
 
-    print("\n✓ Done!")
+    print("\nDone!")
     print(f"  Model: {args.output}/")
     print(f"  Songs tagged: {len(mood_map)}")
 
