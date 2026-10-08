@@ -145,7 +145,8 @@ def execute_tool(
         query = str(args.get("query") or "").strip()
         if not query:
             raise HTTPException(status_code=400, detail="query is required")
-        limit = min(int(args.get("limit") or 15), MAX_SEARCH_RESULTS)
+        raw_limit = args.get("limit")
+        limit = min(int(raw_limit) if isinstance(raw_limit, (int, float, str)) and str(raw_limit).strip() else 15, MAX_SEARCH_RESULTS)
         from sqlalchemy import or_
         MOOD_ALIASES = {
             "romantic": "romantic", "love": "romantic", "romance": "romantic",
