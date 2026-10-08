@@ -25,7 +25,9 @@ TOOLS_SPEC: list[dict] = [
             "description": (
                 "Search the user's music library by title, artist, album or genre. "
                 "Returns matching tracks with ids. Always use this before acting on "
-                "tracks so ids are real — never invent tracks."
+                "tracks so ids are real — never invent tracks. "
+                "Use short keywords (e.g. 'love', 'rain', 'dance') not full phrases. "
+                "For mood/theme requests search the most likely keyword in the title or genre."
             ),
             "parameters": {
                 "type": "object",
@@ -144,15 +146,22 @@ def execute_tool(
         if not query:
             raise HTTPException(status_code=400, detail="query is required")
         limit = min(int(args.get("limit") or 15), MAX_SEARCH_RESULTS)
-        like = f"%{query}%"
+        from sqlalchemy import or_
+        words = [w for w in query.split() if len(w) >= 2]
+        if not words:
+            words = [query]
+        word_filters = []
+        for w in words:
+            like = f"%{w}%"
+            word_filters += [
+                Track.title.ilike(like),
+                Track.artist_name.ilike(like),
+                Track.album_title.ilike(like),
+                Track.genre.ilike(like),
+            ]
         rows = (
             db.query(Track)
-            .filter(
-                (Track.title.ilike(like))
-                | (Track.artist_name.ilike(like))
-                | (Track.album_title.ilike(like))
-                | (Track.genre.ilike(like))
-            )
+            .filter(or_(*word_filters))
             .order_by(Track.play_count.desc(), Track.title.asc())
             .limit(limit)
             .all()
