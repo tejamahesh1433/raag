@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
+import { MaterialIcons } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AlbumCard } from "../components/AlbumCard.android";
 import { TrackItem } from "../components/TrackItem";
@@ -56,6 +57,12 @@ export function LibraryScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Library</Text>
+        <Pressable onPress={() => navigation.navigate("Settings" as never)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <MaterialIcons name="settings" size={24} color={COLORS.muted} />
+        </Pressable>
+      </View>
       <View style={styles.tabRow}>
         {TABS.map((tab) => (
           <Pressable
@@ -151,6 +158,19 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLORS.bg,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.sm,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: COLORS.onBg,
   },
   tabRow: {
     flexDirection: "row",
