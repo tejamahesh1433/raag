@@ -62,6 +62,14 @@ export function MiniPlayer({ onExpand }: Props) {
         >
           <MaterialIcons name="skip-next" size={28} color={COLORS.onSurface} />
         </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={(e) => { e.stopPropagation(); usePlayer.getState().stop(); }}
+          style={styles.iconBtn}
+          accessibilityLabel="Close player"
+        >
+          <MaterialIcons name="close" size={24} color={COLORS.muted} />
+        </TouchableOpacity>
       </Pressable>
     </View>
   );

@@ -34,6 +34,7 @@ interface PlayerState {
   cycleRepeat: () => void;
   toggleFavorite: (trackId: number) => void;
   removeFromQueue: (index: number) => void;
+  stop: () => void;
 }
 
 async function _stopCurrent(): Promise<void> {
@@ -167,6 +168,11 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       api.favorite(trackId).catch(() => {});
     }
     set({ queue: queue.map((t) => t.id === trackId ? { ...t, is_favorite: !t.is_favorite } : t) });
+  },
+
+  stop: () => {
+    _stopCurrent();
+    set({ queue: [], index: -1, playing: false, loading: false, position: 0, duration: 0 });
   },
 
   removeFromQueue: (idx) => {

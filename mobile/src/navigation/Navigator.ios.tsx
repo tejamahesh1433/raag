@@ -152,8 +152,8 @@ export default function Navigator() {
           name="NowPlaying"
           component={NowPlayingScreen}
           options={{
-            presentation: "fullScreenModal",
-            gestureEnabled: true,
+            presentation: "transparentModal",
+            gestureEnabled: false, // swipe-down is handled in NowPlayingScreen
             animation: "slide_from_bottom",
           }}
         />

@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function MiniPlayer({ onExpand }: Props) {
-  const { queue, index, playing, position, duration, toggle, next } = usePlayer();
+  const { queue, index, playing, position, duration, toggle, next, stop } = usePlayer();
 
   const track = index >= 0 ? queue[index] : null;
   if (!track) return null;
@@ -39,10 +39,18 @@ export default function MiniPlayer({ onExpand }: Props) {
             <Text style={styles.artist} numberOfLines={1}>{track.artist}</Text>
           </View>
           <TouchableOpacity onPress={toggle} style={styles.button} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name={playing ? "pause.fill" as any : "play.fill" as any} size={22} color={COLORS.label} />
+            <Ionicons name={playing ? "pause" : "play"} size={22} color={COLORS.label} />
           </TouchableOpacity>
           <TouchableOpacity onPress={next} style={styles.button} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name={"forward.fill" as any} size={22} color={COLORS.label} />
+            <Ionicons name="play-skip-forward" size={22} color={COLORS.label} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={stop}
+            style={styles.button}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Close player"
+          >
+            <Ionicons name="close" size={20} color={COLORS.secondaryLabel} />
           </TouchableOpacity>
         </TouchableOpacity>
         <View style={styles.progressTrack}>
