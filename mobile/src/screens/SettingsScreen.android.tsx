@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   ScrollView,
@@ -12,8 +13,9 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { api, getBaseUrl, getStreamQuality, setBaseUrl, setStreamQuality, type StreamQuality } from "../api";
+import { api, APP_VERSION, getBaseUrl, getStreamQuality, setBaseUrl, setStreamQuality, type StreamQuality } from "../api";
 import { useAuth } from "../store/auth";
+import { useAppUpdate } from "../hooks/useAppUpdate";
 import { COLORS, ELEVATION, RADIUS, SPACING } from "../theme/android";
 
 interface Props {
@@ -80,6 +82,8 @@ export function SettingsScreen({ navigation }: Props) {
   const statusColor = serverStatus === "ok" ? "#30d158" : serverStatus === "error" ? COLORS.accent : COLORS.muted;
   const statusIcon = serverStatus === "ok" ? "check-circle" : serverStatus === "error" ? "cancel" : "help-outline";
 
+  const { state: updateState, progress: dlProgress, serverVersion, error: updateError, checkForUpdate, downloadAndInstall } = useAppUpdate();
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.navBar}>
@@ -138,6 +142,75 @@ export function SettingsScreen({ navigation }: Props) {
           <TouchableOpacity style={styles.row} onPress={handleLogout} activeOpacity={0.7}>
             <Text style={[styles.rowLabel, { color: COLORS.accent }]}>Log Out</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* App Update section */}
+        <Text style={styles.sectionHeader}>App</Text>
+        <View style={[styles.group, ELEVATION.card]}>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Version</Text>
+            <Text style={styles.rowValue}>{APP_VERSION}</Text>
+          </View>
+          {updateState === "available" && (
+            <>
+              <View style={styles.separator} />
+              <View style={styles.row}>
+                <Text style={[styles.rowLabel, { color: "#30d158" }]}>
+                  Update available ({serverVersion})
+                </Text>
+              </View>
+            </>
+          )}
+          {updateState === "uptodate" && (
+            <>
+              <View style={styles.separator} />
+              <View style={styles.row}>
+                <Text style={[styles.rowLabel, { color: COLORS.muted }]}>Up to date</Text>
+              </View>
+            </>
+          )}
+          {updateState === "error" && (
+            <>
+              <View style={styles.separator} />
+              <View style={styles.row}>
+                <Text style={[styles.rowLabel, { color: COLORS.accent }]}>{updateError}</Text>
+              </View>
+            </>
+          )}
+          {(updateState === "downloading" || updateState === "installing") && (
+            <>
+              <View style={styles.separator} />
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>
+                  {updateState === "installing" ? "Installing…" : `Downloading… ${Math.round(dlProgress * 100)}%`}
+                </Text>
+                <ActivityIndicator size="small" color={COLORS.accent} />
+              </View>
+            </>
+          )}
+          <View style={styles.separator} />
+          {updateState === "available" ? (
+            <TouchableOpacity style={styles.row} onPress={downloadAndInstall} activeOpacity={0.7}>
+              <Text style={[styles.rowLabel, { color: COLORS.accent, fontWeight: "700" }]}>
+                Download &amp; Install Update
+              </Text>
+              <MaterialIcons name="system-update" size={20} color={COLORS.accent} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.row}
+              onPress={checkForUpdate}
+              disabled={updateState === "checking" || updateState === "downloading" || updateState === "installing"}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.rowLabel}>
+                {updateState === "checking" ? "Checking…" : "Check for Updates"}
+              </Text>
+              {updateState === "checking"
+                ? <ActivityIndicator size="small" color={COLORS.muted} />
+                : <MaterialIcons name="refresh" size={20} color={COLORS.muted} />}
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 

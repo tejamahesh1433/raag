@@ -226,6 +226,7 @@ def health(db: DbSession = Depends(get_db)):
     return {
         "status": "ok",
         "version": config.VERSION,
+        "apk_version": config.APK_VERSION,
         "tracks": track_count,
         "platform": platform.system(),
     }
