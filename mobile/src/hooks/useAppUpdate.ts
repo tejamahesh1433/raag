@@ -1,5 +1,5 @@
 import { useState } from "react";
-import * as FileSystem from "expo-file-system";
+import { getContentUriAsync } from "expo-file-system/legacy";
 import * as IntentLauncher from "expo-intent-launcher";
 import { File, Paths } from "expo-file-system/next";
 import { APP_VERSION, getBaseUrl } from "../api";
@@ -55,7 +55,7 @@ export function useAppUpdate() {
       setProgress(1);
       setState("installing");
 
-      const contentUri = await FileSystem.getContentUriAsync(downloaded.uri);
+      const contentUri = await getContentUriAsync(downloaded.uri);
       await IntentLauncher.startActivityAsync("android.intent.action.INSTALL_PACKAGE", {
         data: contentUri,
         flags: 1,
