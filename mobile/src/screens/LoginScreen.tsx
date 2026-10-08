@@ -4,6 +4,7 @@
  */
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../store/auth";
+import { DEFAULT_BASE_URL, getBaseUrl } from "../api";
 
 const ACCENT = Platform.OS === "ios" ? "#ff375f" : "#f43f5e";
 const BG = "#0a0a0a";
@@ -24,8 +26,8 @@ const MUTED = "#888888";
 const INPUT_BG = Platform.OS === "ios" ? "#2c2c2e" : "#2a2a2a";
 
 export function LoginScreen() {
-  const { login, loading, error } = useAuth();
-  const [serverUrl, setServerUrl] = useState("http://192.168.4.43:8765");
+  const { login, loginDirectly, loading, error } = useAuth();
+  const [serverUrl, setServerUrl] = useState(getBaseUrl() || DEFAULT_BASE_URL);
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
 
@@ -53,7 +55,7 @@ export function LoginScreen() {
             style={styles.input}
             value={serverUrl}
             onChangeText={setServerUrl}
-            placeholder="http://192.168.1.x:8765"
+            placeholder="https://music.tejainfo.xyz"
             placeholderTextColor={MUTED}
             autoCapitalize="none"
             autoCorrect={false}
@@ -81,17 +83,24 @@ export function LoginScreen() {
             placeholderTextColor={MUTED}
             secureTextEntry
             returnKeyType="done"
-            onSubmitEditing={() => login(serverUrl, username, password)}
+            onSubmitEditing={() => loginDirectly(serverUrl)}
           />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable
-            style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
-            onPress={() => login(serverUrl, username, password)}
+            style={({ pressed }) => [styles.btn, (pressed || loading) && styles.btnPressed]}
+            onPress={() => loginDirectly(serverUrl)}
             disabled={loading}
           >
-            <Text style={styles.btnText}>{loading ? "Connecting…" : "Connect"}</Text>
+            {loading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color="#fff" size="small" style={{ marginRight: 8 }} />
+                <Text style={styles.btnText}>Connecting…</Text>
+              </View>
+            ) : (
+              <Text style={styles.btnText}>Connect Directly</Text>
+            )}
           </Pressable>
         </View>
 
@@ -146,7 +155,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 15,
     alignItems: "center",
+    justifyContent: "center",
     marginTop: 20,
+  },
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   btnPressed: { opacity: 0.8 },
   btnText: { color: "#fff", fontWeight: "700", fontSize: 16 },

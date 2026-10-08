@@ -10,6 +10,7 @@ export type TabParamList = {
 
 export type HomeStackParamList = {
   Home: undefined;
+  ArtistDetail: { artistId: number; artistName: string };
   AlbumDetail: { albumId: number };
   Settings: undefined;
 };

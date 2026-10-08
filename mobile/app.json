@@ -14,6 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "xyz.tejainfo.raag",
+      "deploymentTarget": "17.0",
       "infoPlist": {
         "UIBackgroundModes": [
           "audio"
@@ -43,7 +44,16 @@
       "expo-font",
       "expo-image",
       "expo-status-bar",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0",
+            "enableSceneSupport": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -35,6 +37,8 @@ function playlistColor(id: number): string {
 export function PlaylistsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<PlaylistsStackParamList>>();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState("");
 
   async function loadPlaylists() {
     try {
@@ -48,19 +52,19 @@ export function PlaylistsScreen() {
   }, []);
 
   function handleCreate() {
-    Alert.prompt(
-      "New Playlist",
-      "Enter a name for your playlist",
-      async (name) => {
-        if (!name?.trim()) return;
-        try {
-          await api.createPlaylist(name.trim());
-          loadPlaylists();
-        } catch {}
-      },
-      "plain-text",
-      "",
-    );
+    setNewPlaylistName("");
+    setCreating(true);
+  }
+
+  async function submitCreate() {
+    const name = newPlaylistName.trim();
+    if (!name) return;
+    try {
+      await api.createPlaylist(name);
+      setCreating(false);
+      setNewPlaylistName("");
+      loadPlaylists();
+    } catch {}
   }
 
   function handleDelete(id: number) {
@@ -117,6 +121,43 @@ export function PlaylistsScreen() {
           </View>
         }
       />
+
+      <Modal
+        visible={creating}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCreating(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>New Playlist</Text>
+            <Text style={styles.dialogHelp}>Enter a name for your playlist</Text>
+            <TextInput
+              value={newPlaylistName}
+              onChangeText={setNewPlaylistName}
+              placeholder="Playlist name"
+              placeholderTextColor={COLORS.muted}
+              autoFocus
+              style={styles.dialogInput}
+              onSubmitEditing={() => void submitCreate()}
+            />
+            <View style={styles.dialogActions}>
+              <TouchableOpacity
+                onPress={() => setCreating(false)}
+                style={styles.dialogButton}
+              >
+                <Text style={styles.dialogButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => void submitCreate()}
+                style={styles.dialogButton}
+              >
+                <Text style={[styles.dialogButtonText, styles.dialogButtonPrimary]}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -194,5 +235,56 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: 13,
     color: COLORS.muted,
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    padding: SPACING.lg,
+    backgroundColor: "rgba(0,0,0,0.72)",
+  },
+  dialog: {
+    padding: SPACING.lg,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.surface,
+  },
+  dialogTitle: {
+    color: COLORS.onBg,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  dialogHelp: {
+    color: COLORS.muted,
+    fontSize: 14,
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+  dialogInput: {
+    color: COLORS.onBg,
+    backgroundColor: COLORS.surfaceVariant,
+    borderColor: COLORS.outline,
+    borderWidth: 1,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 12,
+    fontSize: 16,
+  },
+  dialogActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: SPACING.sm,
+    marginTop: SPACING.lg,
+  },
+  dialogButton: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.sm,
+  },
+  dialogButtonText: {
+    color: COLORS.muted,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  dialogButtonPrimary: {
+    color: COLORS.accent,
   },
 });

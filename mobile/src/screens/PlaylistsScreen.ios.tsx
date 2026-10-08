@@ -8,23 +8,29 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../api";
 import type { Playlist } from "../types";
-import { COLORS, FONT, RADIUS, SPACING } from "../theme/ios";
+import { COLORS, FONT, RADIUS, SHADOW, SPACING } from "../theme/ios";
 
 interface Props {
   navigation: NativeStackNavigationProp<any>;
 }
 
-const ACCENT_PALETTE = [
-  "#ff375f", "#30d158", "#0a84ff", "#ff9f0a", "#bf5af2",
-  "#5ac8fa", "#ff6961", "#ffb347",
+const GRADIENT_PALETTES = [
+  ["#ff2d55", "#b80036"] as const,
+  ["#af52de", "#581c87"] as const,
+  ["#0a84ff", "#0040aa"] as const,
+  ["#30d158", "#146c2e"] as const,
+  ["#ff9f0a", "#b35300"] as const,
+  ["#5ac8fa", "#147efb"] as const,
+  ["#ff375f", "#990033"] as const,
 ];
 
-function playlistColor(id: number): string {
-  return ACCENT_PALETTE[id % ACCENT_PALETTE.length];
+function getPlaylistGradient(id: number) {
+  return GRADIENT_PALETTES[id % GRADIENT_PALETTES.length];
 }
 
 export default function PlaylistsScreen({ navigation }: Props) {
@@ -69,7 +75,7 @@ export default function PlaylistsScreen({ navigation }: Props) {
   }
 
   function renderItem({ item }: { item: Playlist }) {
-    const color = playlistColor(item.id);
+    const colors = getPlaylistGradient(item.id);
     return (
       <TouchableOpacity
         style={styles.row}
@@ -78,9 +84,29 @@ export default function PlaylistsScreen({ navigation }: Props) {
         onLongPress={() => item.kind === "manual" && handleDelete(item.id)}
         delayLongPress={400}
       >
-        <View style={[styles.icon, { backgroundColor: color }]}>
-          <Text style={styles.iconLetter}>{item.name[0]?.toUpperCase()}</Text>
+        {/* Glossy Playlist Icon Badge */}
+        <View style={styles.iconShadow}>
+          <View style={styles.iconContainer}>
+            <LinearGradient
+              colors={colors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            {/* Diagonal Gloss Sheen */}
+            <LinearGradient
+              colors={["rgba(255, 255, 255, 0.42)", "rgba(255, 255, 255, 0.08)", "transparent"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0.7, y: 0.7 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+            {/* Specular Rim */}
+            <View style={styles.iconRim} pointerEvents="none" />
+            <Text style={styles.iconLetter}>{item.name[0]?.toUpperCase() ?? "P"}</Text>
+          </View>
         </View>
+
         <View style={styles.textBlock}>
           <Text style={styles.name}>{item.name}</Text>
           <Text style={styles.sub}>{item.track_count} songs</Text>
@@ -91,35 +117,51 @@ export default function PlaylistsScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.header}>
-        <Text style={styles.largeTitle}>Playlists</Text>
-        <TouchableOpacity onPress={handleCreate} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="add-circle" size={28} color={COLORS.accent} />
-        </TouchableOpacity>
-      </View>
-      <FlatList
-        data={playlists}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="musical-notes-outline" size={48} color={COLORS.muted} />
-            <Text style={styles.emptyText}>No playlists yet</Text>
-            <Text style={styles.emptySubtext}>Tap + to create one</Text>
-          </View>
-        }
+    <View style={styles.root}>
+      {/* Ambient background gradient */}
+      <LinearGradient
+        colors={["#160c1c", "#0a0910", "#030305"]}
+        style={StyleSheet.absoluteFill}
       />
-    </SafeAreaView>
+
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.header}>
+          <Text style={styles.largeTitle}>Playlists</Text>
+          <TouchableOpacity
+            onPress={handleCreate}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="add-circle" size={30} color={COLORS.accent} />
+          </TouchableOpacity>
+        </View>
+
+        <FlatList
+          data={playlists}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Ionicons name="musical-notes-outline" size={54} color={COLORS.muted} />
+              <Text style={styles.emptyText}>No playlists yet</Text>
+              <Text style={styles.emptySubtext}>Tap + to create one</Text>
+            </View>
+          }
+        />
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  root: {
     flex: 1,
     backgroundColor: COLORS.bg,
+  },
+  safe: {
+    flex: 1,
   },
   header: {
     flexDirection: "row",
@@ -133,6 +175,7 @@ const styles = StyleSheet.create({
     fontSize: 34,
     fontWeight: "700",
     color: COLORS.label,
+    letterSpacing: -0.4,
   },
   listContent: {
     paddingBottom: 120,
@@ -141,35 +184,48 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: SPACING.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.separator,
-    gap: SPACING.sm,
+    gap: SPACING.md,
   },
-  icon: {
-    width: 48,
-    height: 48,
-    borderRadius: RADIUS.sm,
+  iconShadow: {
+    ...SHADOW.gloss,
+    borderRadius: RADIUS.md,
+  },
+  iconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: RADIUS.md,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
+  },
+  iconRim: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.20)",
+    borderTopColor: "rgba(255, 255, 255, 0.45)",
   },
   iconLetter: {
-    fontSize: FONT.title3,
-    fontWeight: "700",
-    color: COLORS.onAccent,
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#ffffff",
   },
   textBlock: {
     flex: 1,
   },
   name: {
     fontSize: FONT.body,
-    fontWeight: "400",
+    fontWeight: "600",
     color: COLORS.label,
   },
   sub: {
     fontSize: FONT.footnote,
     color: COLORS.secondaryLabel,
-    marginTop: 1,
+    marginTop: 2,
   },
   empty: {
     alignItems: "center",

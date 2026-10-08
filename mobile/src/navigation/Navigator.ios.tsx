@@ -110,6 +110,7 @@ function TabsWithMiniPlayer() {
   return (
     <View style={{ flex: 1 }}>
       <Tab.Navigator
+        initialRouteName="HomeTab"
         screenOptions={({ route }) => ({
           headerShown: false,
           tabBarBackground: () => (

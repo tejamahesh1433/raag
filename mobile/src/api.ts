@@ -12,7 +12,9 @@ const QUALITY_KEY = "raag_stream_quality";
 
 export type StreamQuality = "original" | "high" | "medium" | "low";
 
-let _baseUrl = "";
+export const DEFAULT_BASE_URL = "https://music.tejainfo.xyz";
+
+let _baseUrl = DEFAULT_BASE_URL;
 let _cookie = "";
 let _streamQuality: StreamQuality = "original";
 
@@ -22,7 +24,12 @@ export async function initApi(): Promise<void> {
     SecureStore.getItemAsync(COOKIE_KEY),
     AsyncStorage.getItem(QUALITY_KEY),
   ]);
-  _baseUrl = baseUrl ?? "";
+  if (!baseUrl || baseUrl.includes(":8765")) {
+    _baseUrl = DEFAULT_BASE_URL;
+    await AsyncStorage.setItem(BASE_URL_KEY, DEFAULT_BASE_URL);
+  } else {
+    _baseUrl = baseUrl;
+  }
   _cookie = cookie ?? "";
   if (quality === "original" || quality === "high" || quality === "medium" || quality === "low") {
     _streamQuality = quality;
@@ -30,12 +37,13 @@ export async function initApi(): Promise<void> {
 }
 
 export async function setBaseUrl(url: string): Promise<void> {
-  _baseUrl = url.replace(/\/$/, "");
+  const trimmed = url.trim();
+  _baseUrl = (trimmed || DEFAULT_BASE_URL).replace(/\/$/, "");
   await AsyncStorage.setItem(BASE_URL_KEY, _baseUrl);
 }
 
 export function getBaseUrl(): string {
-  return _baseUrl;
+  return _baseUrl || DEFAULT_BASE_URL;
 }
 
 export function getStreamQuality(): StreamQuality {
@@ -65,14 +73,14 @@ function _reasonPhrase(status: number, text: string): string {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 8000): Promise<T> {
   const headers: Record<string, string> = {
     ...(init.body && typeof init.body === "string" ? { "Content-Type": "application/json" } : {}),
     ...((_cookie ? { Cookie: _cookie } : {}) as Record<string, string>),
     ...(init.headers as Record<string, string>),
   };
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${_baseUrl}${path}`, { ...init, headers, signal: controller.signal });
     clearTimeout(timeout);
@@ -163,7 +171,7 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }),
   logout: () => request<{ message: string }>("/api/auth/logout", { method: "POST" }),
-  me: () => request<User>("/api/auth/me"),
+  me: (timeoutMs = 4000) => request<User>("/api/auth/me", {}, timeoutMs),
 
   // library
   tracks: (params: { offset?: number; limit?: number; order?: string; genre?: string } = {}) => {

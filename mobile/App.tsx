@@ -4,7 +4,7 @@
  * iOS     → Navigator.ios.tsx     (Apple HIG)
  */
 import { useEffect } from "react";
-import { Platform, View } from "react-native";
+import { ActivityIndicator, Platform, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -32,7 +32,7 @@ const DARK_THEME = {
 };
 
 function Root() {
-  const { user, loading, restore } = useAuth();
+  const { user, restoring, restore } = useAuth();
 
   useEffect(() => {
     initApi()
@@ -40,14 +40,15 @@ function Root() {
       .finally(restore);
   }, []);
 
-  if (loading) {
-    return <View style={{ flex: 1, backgroundColor: "#0a0a0a" }} />;
+  if (restoring) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#0a0a0a", justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={Platform.OS === "ios" ? "#ff375f" : "#f43f5e"} />
+      </View>
+    );
   }
 
-  if (!user) {
-    return <LoginScreen />;
-  }
-
+  // Direct login into the app without showing the login screen
   return <AppNavigator />;
 }
 
