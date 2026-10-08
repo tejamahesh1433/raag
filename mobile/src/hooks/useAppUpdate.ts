@@ -1,6 +1,7 @@
 import { useState } from "react";
 import * as FileSystem from "expo-file-system";
 import * as IntentLauncher from "expo-intent-launcher";
+import { File, Paths } from "expo-file-system/next";
 import { APP_VERSION, getBaseUrl } from "../api";
 
 export type UpdateState = "idle" | "checking" | "available" | "downloading" | "installing" | "uptodate" | "error";
@@ -30,7 +31,7 @@ export function useAppUpdate() {
       const sv: string = data.apk_version ?? data.version ?? "0.0.0";
       setServerVersion(sv);
       setState(semverGt(sv, APP_VERSION) ? "available" : "uptodate");
-    } catch (e) {
+    } catch {
       setError("Could not reach server");
       setState("error");
     }
@@ -41,26 +42,19 @@ export function useAppUpdate() {
     setProgress(0);
     setError(null);
     const apkUrl = `${getBaseUrl()}/downloads/raag.apk`;
-    const dest = FileSystem.cacheDirectory + "raag.apk";
     try {
-      const dl = FileSystem.createDownloadResumable(
-        apkUrl,
-        dest,
-        {},
-        ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
-          if (totalBytesExpectedToWrite > 0) {
-            setProgress(totalBytesWritten / totalBytesExpectedToWrite);
-          }
-        }
-      );
-      const result = await dl.downloadAsync();
-      if (!result?.uri) throw new Error("Download failed");
+      const file = new File(Paths.cache, "raag.apk");
+      if (file.exists) file.delete();
+
+      // New expo-file-system/next API — native download, no deprecated resumable
+      await file.downloadAsync(apkUrl);
+      setProgress(1);
+
       setState("installing");
-      // Get a content:// URI via FileProvider so Android can install it
-      const contentUri = await FileSystem.getContentUriAsync(result.uri);
+      const contentUri = await FileSystem.getContentUriAsync(file.uri);
       await IntentLauncher.startActivityAsync("android.intent.action.INSTALL_PACKAGE", {
         data: contentUri,
-        flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+        flags: 1,
         type: "application/vnd.android.package-archive",
       });
       setState("idle");
