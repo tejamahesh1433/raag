@@ -206,6 +206,19 @@ def get_job(
     return job
 
 
+@router.get("/downloads/manifest")
+def downloads_manifest():
+    """Return which app builds are available for download."""
+    apk_path = config.DATA_DIR / "downloads" / "raag.apk"
+    return {
+        "android": {
+            "available": apk_path.exists(),
+            "url": "/downloads/raag.apk" if apk_path.exists() else None,
+            "size_mb": round(apk_path.stat().st_size / 1_048_576, 1) if apk_path.exists() else None,
+        }
+    }
+
+
 @router.get("/health")
 def health(db: DbSession = Depends(get_db)):
     """Public health probe (no secrets): liveness + basic counts."""

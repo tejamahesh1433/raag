@@ -184,6 +184,8 @@ export const api = {
   },
 
   // system
+  downloadsManifest: () =>
+    request<{ android: { available: boolean; url: string | null; size_mb: number | null } }>("/api/downloads/manifest"),
   scan: () => request<{ job_id: number; status: string }>("/api/library/scan", { method: "POST" }),
   job: (id: number) => request<Job>(`/api/jobs/${id}`),
   health: () =>

@@ -97,6 +97,11 @@ def _mount_spa(app: FastAPI) -> None:
     if (WEB_DIST / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
 
+    # Serve downloadable app builds (APK etc.) from the persistent data volume.
+    downloads_dir = config.DATA_DIR / "downloads"
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/downloads", StaticFiles(directory=downloads_dir), name="downloads")
+
     @app.get("/{path:path}", include_in_schema=False)
     def spa_fallback(path: str):
         if path.startswith("api/"):

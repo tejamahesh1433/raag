@@ -1,7 +1,13 @@
+import { useEffect, useState } from "react";
+import { api } from "../api";
 import { PageHeader } from "../components/ui";
 import { IconDownload } from "../components/icons";
 
-function QrCodePlaceholder({ url }: { url: string }) {
+interface DownloadsManifest {
+  android: { available: boolean; url: string | null; size_mb: number | null };
+}
+
+function QrCode({ url }: { url: string }) {
   const encoded = encodeURIComponent(url);
   return (
     <img
@@ -16,7 +22,13 @@ function QrCodePlaceholder({ url }: { url: string }) {
 
 export function DownloadPage() {
   const appBaseUrl = window.location.origin;
-  const androidApkUrl = `${appBaseUrl}/downloads/raag.apk`;
+  const [manifest, setManifest] = useState<DownloadsManifest | null>(null);
+
+  useEffect(() => {
+    api.downloadsManifest().then(setManifest).catch(() => setManifest(null));
+  }, []);
+
+  const apk = manifest?.android;
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
@@ -34,26 +46,51 @@ export function DownloadPage() {
                 <AndroidIcon />
                 <h2 className="text-base font-semibold text-ink">Android</h2>
               </div>
-              <p className="mb-4 text-sm text-muted">
-                Download the APK and install it directly on your Android device.
-                You may need to allow installation from unknown sources in Settings.
-              </p>
-              <a
-                href={androidApkUrl}
-                download="raag.apk"
-                className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
-              >
-                <IconDownload size={16} />
-                Download APK
-              </a>
-              <p className="mt-3 text-xs text-muted/70">
-                Settings → Apps → Install unknown apps → allow your browser
-              </p>
+
+              {apk?.available ? (
+                <>
+                  <p className="mb-4 text-sm text-muted">
+                    Download and install the APK directly on your Android device.
+                    You may need to allow installation from unknown sources in Settings.
+                  </p>
+                  <a
+                    href={apk.url!}
+                    download="raag.apk"
+                    className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+                  >
+                    <IconDownload size={16} />
+                    Download APK{apk.size_mb ? ` · ${apk.size_mb} MB` : ""}
+                  </a>
+                  <p className="mt-3 text-xs text-muted/70">
+                    Settings → Apps → Install unknown apps → allow your browser
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mb-4 text-sm text-muted">
+                    The Android APK hasn't been built yet. Build it with:
+                  </p>
+                  <div className="rounded-xl bg-ink/5 px-4 py-3 font-mono text-xs text-ink">
+                    <p className="mb-1 text-muted"># in the mobile/ directory</p>
+                    <p>npx eas build -p android --profile preview --local</p>
+                    <p className="mt-2 text-muted"># then copy the .apk to the server:</p>
+                    <p>scp raag-*.apk teja@192.168.4.43:~/apps/raag/downloads/raag.apk</p>
+                    <p className="mt-2 text-muted"># copy into the Docker volume:</p>
+                    <p>ssh teja@192.168.4.43 "docker cp ~/apps/raag/downloads/raag.apk music-server:/data/downloads/raag.apk"</p>
+                  </div>
+                  <p className="mt-3 text-sm text-muted/70">
+                    Once uploaded, refresh this page — the download button will appear.
+                  </p>
+                </>
+              )}
             </div>
-            <div className="hidden shrink-0 sm:block">
-              <QrCodePlaceholder url={androidApkUrl} />
-              <p className="mt-2 text-center text-[11px] text-muted">Scan to download</p>
-            </div>
+
+            {apk?.available && (
+              <div className="hidden shrink-0 sm:block">
+                <QrCode url={`${appBaseUrl}/downloads/raag.apk`} />
+                <p className="mt-2 text-center text-[11px] text-muted">Scan to download</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -67,7 +104,8 @@ export function DownloadPage() {
               </div>
               <p className="mb-4 text-sm text-muted">
                 Add Raag to your iPhone home screen as a web app — no App Store needed.
-                Open this page in Safari, tap the Share button, then <strong>Add to Home Screen</strong>.
+                Open this page in Safari, tap the Share button, then{" "}
+                <strong>Add to Home Screen</strong>.
               </p>
               <a
                 href={appBaseUrl}
@@ -77,12 +115,10 @@ export function DownloadPage() {
               >
                 Open in Safari
               </a>
-              <p className="mt-3 text-xs text-muted/70">
-                Share → Add to Home Screen → Add
-              </p>
+              <p className="mt-3 text-xs text-muted/70">Share → Add to Home Screen → Add</p>
             </div>
             <div className="hidden shrink-0 sm:block">
-              <QrCodePlaceholder url={appBaseUrl} />
+              <QrCode url={appBaseUrl} />
               <p className="mt-2 text-center text-[11px] text-muted">Scan to open</p>
             </div>
           </div>
@@ -91,8 +127,9 @@ export function DownloadPage() {
         {/* Connection tip */}
         <div className="rounded-xl border border-border-subtle bg-surface/50 px-5 py-4 text-sm text-muted">
           <span className="font-medium text-ink">Tip:</span> Make sure your phone is on the same
-          Wi-Fi network as your Raag server, then enter <code className="rounded bg-ink/8 px-1 font-mono text-xs text-ink">{appBaseUrl}</code> as
-          the server URL when setting up the app.
+          Wi-Fi network as your Raag server, then enter{" "}
+          <code className="rounded bg-ink/8 px-1 font-mono text-xs text-ink">{appBaseUrl}</code> as
+          the server URL in the Android app.
         </div>
       </div>
     </div>
