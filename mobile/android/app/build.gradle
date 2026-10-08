@@ -119,7 +119,6 @@ android {
             } else {
                 signingConfig signingConfigs.debug
             }
-        }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -156,14 +155,10 @@ android {
         }
     }
 }
+def isWebpEnabled = (findProperty('expo.webp.enabled') ?: false).toBoolean()
+def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: false).toBoolean()
+
 dependencies {
-dependencies {
-    // The version of react-native is set by the React Native Gradle Plugin
-    implementation("com.facebook.react:react-android")
-dependencies {
-dependencies {
-    // The version of react-native is set by the React Native Gradle Plugin
-    implementation("com.facebook.react:react-android")
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
     if (isWebpEnabled) {
