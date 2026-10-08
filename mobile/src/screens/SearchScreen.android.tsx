@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Image } from "expo-image";
 import { MaterialIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -18,16 +17,23 @@ import { api } from "../api";
 import { usePlayer } from "../store/player";
 import { AlbumCard } from "../components/AlbumCard.android";
 import { TrackItem } from "../components/TrackItem";
-import { COLORS, ELEVATION, RADIUS, SPACING } from "../theme/android";
+import { Artwork } from "../components/Artwork";
+import { COLORS, RADIUS, SPACING } from "../theme/android";
 
 interface Props {
   navigation: NativeStackNavigationProp<any>;
 }
 
-function formatDuration(s: number) {
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, "0")}`;
+// Deterministic color per genre name
+const GENRE_COLORS = [
+  "#1db954", "#e13300", "#503750", "#006450",
+  "#8d67ab", "#e8115b", "#148a08", "#1e3264",
+  "#b02897", "#c87d3e", "#477d95", "#e91429",
+];
+function genreColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return GENRE_COLORS[h % GENRE_COLORS.length];
 }
 
 export function SearchScreen({ navigation }: Props) {
@@ -35,6 +41,8 @@ export function SearchScreen({ navigation }: Props) {
   const [results, setResults] = useState<{ tracks: any[]; albums: any[]; artists: any[] } | null>(null);
   const [genres, setGenres] = useState<{ genre: string; count: number }[]>([]);
   const [searching, setSearching] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { playNow } = usePlayer();
 
@@ -44,148 +52,148 @@ export function SearchScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) {
-      setResults(null);
-      setSearching(false);
-      return;
-    }
+    if (!query.trim()) { setResults(null); setSearching(false); return; }
     setSearching(true);
     debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await api.search(query);
-        setResults(res);
-      } catch {}
+      try { setResults(await api.search(query)); } catch {}
       setSearching(false);
     }, 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query]);
 
-  const genreGrid = genres.slice(0, 12);
-  const cols = 3;
-  const rows: typeof genres[] = [];
-  for (let i = 0; i < genreGrid.length; i += cols) {
-    rows.push(genreGrid.slice(i, i + cols));
-  }
+  const hasResults = results && (results.tracks.length + results.albums.length + results.artists.length) > 0;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.titleRow}>
-        <Text style={styles.largeTitle}>Search</Text>
-        <TouchableOpacity onPress={() => navigation.navigate("Settings" as any)} style={styles.settingsBtn}>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Search</Text>
+        <TouchableOpacity onPress={() => navigation.navigate("Settings" as any)} style={styles.headerBtn}>
           <MaterialIcons name="settings" size={24} color={COLORS.muted} />
         </TouchableOpacity>
       </View>
 
       {/* Search bar */}
-      <View style={styles.searchBar}>
-        <MaterialIcons name="search" size={20} color={COLORS.muted} style={styles.searchIcon} />
+      <View style={[styles.searchWrap, focused && styles.searchWrapFocused]}>
+        <MaterialIcons name="search" size={22} color={focused ? COLORS.accent : COLORS.muted} />
         <TextInput
+          ref={inputRef}
           style={styles.searchInput}
-          placeholder="Artists, songs, albums"
+          placeholder="Songs, artists, albums…"
           placeholderTextColor={COLORS.muted}
           value={query}
           onChangeText={setQuery}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           returnKeyType="search"
           autoCorrect={false}
           autoCapitalize="none"
         />
-        {searching && <ActivityIndicator size="small" color={COLORS.muted} style={{ marginRight: SPACING.sm }} />}
+        {searching
+          ? <ActivityIndicator size="small" color={COLORS.accent} />
+          : query.length > 0
+            ? <TouchableOpacity onPress={() => setQuery("")}>
+                <MaterialIcons name="close" size={20} color={COLORS.muted} />
+              </TouchableOpacity>
+            : null}
       </View>
 
       {!query.trim() ? (
-        /* Browse categories - Material You chips */
-        <ScrollView contentContainerStyle={styles.browseContent} showsVerticalScrollIndicator={false}>
-          <Text style={styles.browseTitle}>Browse Genres</Text>
+        /* Browse */
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.browseContent}>
+          <Text style={styles.sectionLabel}>Browse</Text>
           <View style={styles.genreGrid}>
-            {genres.slice(0, 18).map(({ genre }, i) => (
+            {genres.slice(0, 18).map(({ genre, count }) => (
               <Pressable
                 key={genre}
-                style={[{ backgroundColor: i % 2 === 0 ? COLORS.accentContainer : COLORS.surfaceVariant }, styles.genreChip]}
+                style={[styles.genreCard, { backgroundColor: genreColor(genre) }]}
                 onPress={() => setQuery(genre)}
+                android_ripple={{ color: "rgba(255,255,255,0.2)" }}
               >
-                <Text style={styles.genreChipText}>{genre}</Text>
+                <Text style={styles.genreName} numberOfLines={2}>{genre}</Text>
+                <Text style={styles.genreCount}>{count} songs</Text>
               </Pressable>
             ))}
           </View>
-          <View style={{ height: 140 }} />
         </ScrollView>
       ) : (
         /* Results */
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
-          {results && (
-            <>
-              {/* Songs */}
-              {results.tracks.length > 0 && (
-                <View style={styles.resultSection}>
-                  <View style={styles.resultHeader}>
-                    <Text style={styles.resultSectionTitle}>Songs</Text>
-                  </View>
-                  {results.tracks.slice(0, 8).map((track, i) => (
-                    <TrackItem
-                      key={track.id}
-                      track={track}
-                      isPlaying={false}
-                      onPress={() => playNow(results.tracks, i)}
-                      showAlbum
-                    />
-                  ))}
-                </View>
-              )}
-
-              {/* Albums */}
-              {results.albums.length > 0 && (
-                <View style={styles.resultSection}>
-                  <View style={styles.resultHeader}>
-                    <Text style={styles.resultSectionTitle}>Albums</Text>
-                  </View>
-                  <FlatList
-                    data={results.albums.slice(0, 8)}
-                    horizontal
-                    keyExtractor={(item) => String(item.id)}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.albumsRow}
-                    ItemSeparatorComponent={() => <View style={{ width: SPACING.sm }} />}
-                    renderItem={({ item }) => (
-                      <View style={styles.albumCardWrap}>
-                        <AlbumCard
-                          album={item}
-                          onPress={() => navigation.navigate("AlbumDetail", { albumId: item.id })}
-                        />
-                      </View>
-                    )}
-                  />
-                </View>
-              )}
-
-              {/* Artists */}
-              {results.artists.length > 0 && (
-                <View style={styles.resultSection}>
-                  <View style={styles.resultHeader}>
-                    <Text style={styles.resultSectionTitle}>Artists</Text>
-                  </View>
-                  {results.artists.slice(0, 5).map((artist) => (
-                    <Pressable
-                      key={artist.id}
-                      style={({ pressed }) => [styles.artistRow, pressed && styles.artistRowPressed]}
-                      onPress={() => navigation.navigate("ArtistDetail", { artistId: artist.id, artistName: artist.name })}
-                    >
-                      <View style={styles.artistAvatar}>
-                        <Text style={styles.avatarLetter}>{artist.name[0]?.toUpperCase()}</Text>
-                      </View>
-                      <View style={styles.artistText}>
-                        <Text style={styles.artistName}>{artist.name}</Text>
-                        <Text style={styles.artistSub}>{artist.album_count} albums</Text>
-                      </View>
-                      <MaterialIcons name="chevron-right" size={20} color={COLORS.muted} />
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-            </>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.resultsContent}
+        >
+          {searching && !results && (
+            <View style={styles.center}>
+              <ActivityIndicator color={COLORS.accent} />
+            </View>
           )}
-          <View style={{ height: 140 }} />
+
+          {results && !hasResults && (
+            <View style={styles.center}>
+              <MaterialIcons name="search-off" size={48} color={COLORS.muted} />
+              <Text style={styles.emptyText}>No results for "{query}"</Text>
+            </View>
+          )}
+
+          {results && results.tracks.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Songs</Text>
+              {results.tracks.slice(0, 8).map((track, i) => (
+                <TrackItem
+                  key={track.id}
+                  track={track}
+                  isPlaying={false}
+                  onPress={() => playNow(results.tracks, i)}
+                  showAlbum
+                />
+              ))}
+            </View>
+          )}
+
+          {results && results.albums.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Albums</Text>
+              <FlatList
+                data={results.albums.slice(0, 8)}
+                horizontal
+                keyExtractor={(item) => String(item.id)}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: SPACING.md, gap: SPACING.sm }}
+                renderItem={({ item }) => (
+                  <View style={{ width: 148 }}>
+                    <AlbumCard
+                      album={item}
+                      onPress={() => navigation.navigate("AlbumDetail", { albumId: item.id })}
+                    />
+                  </View>
+                )}
+              />
+            </View>
+          )}
+
+          {results && results.artists.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Artists</Text>
+              {results.artists.slice(0, 5).map((artist) => (
+                <Pressable
+                  key={artist.id}
+                  style={({ pressed }) => [styles.artistRow, pressed && { backgroundColor: COLORS.surfaceVariant }]}
+                  onPress={() => navigation.navigate("ArtistDetail", { artistId: artist.id, artistName: artist.name })}
+                >
+                  <View style={styles.artistAvatar}>
+                    <Text style={styles.avatarLetter}>{artist.name[0]?.toUpperCase()}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.artistName}>{artist.name}</Text>
+                    <Text style={styles.artistSub}>{artist.album_count} albums</Text>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={22} color={COLORS.muted} />
+                </Pressable>
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -193,119 +201,125 @@ export function SearchScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  titleRow: {
+  safe: { flex: 1, backgroundColor: COLORS.bg },
+
+  header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingRight: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: 4,
   },
-  largeTitle: {
+  title: {
     fontSize: 28,
     fontWeight: "900",
     color: COLORS.onBg,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-    paddingBottom: SPACING.sm,
   },
-  settingsBtn: {
-    padding: SPACING.sm,
-  },
-  searchBar: {
+  headerBtn: { padding: SPACING.sm },
+
+  searchWrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surfaceVariant,
-    borderRadius: RADIUS.pill,
+    gap: SPACING.sm,
     marginHorizontal: SPACING.md,
     marginBottom: SPACING.md,
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingVertical: 12,
+    backgroundColor: COLORS.surfaceVariant,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: "transparent",
   },
-  searchIcon: {
-    marginRight: SPACING.xs,
+  searchWrapFocused: {
+    borderColor: COLORS.accent,
+    backgroundColor: COLORS.surface,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
     color: COLORS.onBg,
+    padding: 0,
   },
+
   browseContent: {
-    paddingHorizontal: SPACING.md,
     paddingBottom: 140,
   },
-  browseTitle: {
-    fontSize: 20,
+  sectionLabel: {
+    fontSize: 18,
     fontWeight: "800",
     color: COLORS.onBg,
-    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+    marginTop: 4,
   },
   genreGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    paddingHorizontal: SPACING.md,
     gap: SPACING.sm,
   },
-  genreChip: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: COLORS.outline,
-    minWidth: 90,
+  genreCard: {
+    width: "48.5%",
+    height: 88,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    justifyContent: "flex-end",
+    overflow: "hidden",
   },
-  genreChipText: {
-    fontSize: 13,
-    color: COLORS.onSurface,
-    textAlign: "center",
-  },
-  resultSection: {
-    marginBottom: SPACING.xl,
-    paddingHorizontal: SPACING.md,
-  },
-  resultHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: SPACING.sm,
-  },
-  resultSectionTitle: {
-    fontSize: 20,
+  genreName: {
+    fontSize: 16,
     fontWeight: "800",
-    color: COLORS.onBg,
+    color: "#fff",
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
+  genreCount: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.75)",
+    marginTop: 2,
+  },
+
+  resultsContent: {
+    paddingBottom: 140,
+  },
+  section: {
+    marginBottom: SPACING.lg,
+  },
+  center: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    gap: SPACING.md,
+  },
+  emptyText: {
+    color: COLORS.muted,
+    fontSize: 15,
+  },
+
   artistRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.outline,
+    paddingVertical: 12,
     gap: SPACING.md,
-    backgroundColor: COLORS.surface,
-  },
-  artistRowPressed: {
-    backgroundColor: COLORS.surfaceVariant,
   },
   artistAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: COLORS.surfaceVariant,
     alignItems: "center",
     justifyContent: "center",
   },
   avatarLetter: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
     color: COLORS.muted,
   },
-  artistText: {
-    flex: 1,
-  },
   artistName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
     color: COLORS.onBg,
   },
@@ -313,12 +327,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.muted,
     marginTop: 2,
-  },
-  albumsRow: {
-    gap: SPACING.md,
-    paddingBottom: SPACING.sm,
-  },
-  albumCardWrap: {
-    width: 150,
   },
 });
