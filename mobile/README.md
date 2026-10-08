@@ -29,11 +29,12 @@ Scan the QR code in Expo Go on your device.
 
 ## First-run setup
 
-1. On the Login screen enter your server URL (e.g. `http://192.168.1.10:8765` or `https://music.yoursite.com`)
-2. Enter username/password (if open-access mode is on, any credentials work)
-3. Tap **Connect**
+1. On the Connect screen enter your server URL. The default is `https://music.tejainfo.xyz` — change it if you self-host on a different address (e.g. `http://192.168.1.10:8765`).
+2. Tap **Connect**. No username or password is required: the server runs with `AUTH_REQUIRED=0` (open access by design).
 
 ## Building for distribution
+
+**Android build requirements:** Java 17 (Amazon Corretto 17 recommended), Gradle 9.3.1 (set in `gradle/wrapper/gradle-wrapper.properties`), minSdk 24 (Android 7+), targetSdk 36.
 
 Do not distribute `android/app/build/outputs/apk/debug/app-debug.apk`. Debug APKs
 expect a Metro development server and will show "Unable to load script" when
@@ -64,17 +65,29 @@ eas build --platform android
 eas build --platform ios
 ```
 
+## In-app APK update flow
+
+The `useAppUpdate` hook (in `src/hooks/useAppUpdate.ts`) checks the server for a newer APK and installs it without leaving the app:
+
+1. **Check** — GET `/api/health`; reads `apk_version` from the response and compares it against `APP_VERSION` in `src/api.ts` (currently `1.0.5`).
+2. **Download** — if the server version is higher, downloads `<serverUrl>/downloads/raag.apk` to the app's cache directory via `expo-file-system`.
+3. **Install** — resolves a `content://` URI via `FileSystem.getContentUriAsync`, then launches the Android package installer via `expo-intent-launcher`.
+
+Android manifest requirements (already present): `REQUEST_INSTALL_PACKAGES` permission + a `FileProvider` entry pointing at `@xml/file_provider_paths`.
+
 ## Project structure
 
 ```
 mobile/
 ├── App.tsx                     ← Auth gate + platform Navigator selection
 ├── src/
-│   ├── api.ts                  ← REST client (cookie-based auth, configurable URL)
+│   ├── api.ts                  ← REST client (configurable URL, DEFAULT_SERVER_URL = https://music.tejainfo.xyz)
 │   ├── types.ts                ← Shared TypeScript interfaces
 │   ├── store/
 │   │   ├── auth.ts             ← Auth state (Zustand)
 │   │   └── player.ts           ← Audio player (expo-audio, background audio)
+│   ├── hooks/
+│   │   └── useAppUpdate.ts     ← In-app APK updater (checks /api/health, downloads, installs via IntentLauncher)
 │   ├── theme/
 │   │   ├── android.ts          ← Material Design 3 tokens
 │   │   └── ios.ts              ← Apple HIG tokens
@@ -86,7 +99,7 @@ mobile/
 │   │   ├── MiniPlayer.android  ← Bottom bar above tab nav
 │   │   └── MiniPlayer.ios      ← Floating BlurView card
 │   ├── screens/
-│   │   ├── LoginScreen.tsx     ← Shared adaptive login
+│   │   ├── ConnectScreen.tsx   ← Server URL entry (no username/password; open-access by design)
 │   │   ├── Home.*              ← Recently added, genres, hero card
 │   │   ├── Library.*           ← Artists / Albums / Songs / Favorites
 │   │   ├── Search.*            ← Live search + genre browse
@@ -95,10 +108,10 @@ mobile/
 │   │   ├── AlbumDetail.*       ← Album tracks + disc grouping
 │   │   ├── ArtistDetail.*      ← Artist albums + top tracks
 │   │   ├── NowPlaying.*        ← Full-screen player (modal)
-│   │   └── Settings.*          ← Server URL, quality, account
+│   │   └── Settings.*          ← Server URL, stream quality, in-app update; gear icon (⚙) in every tab header opens this as a modal
 │   └── navigation/
-│       ├── Navigator.android   ← Material bottom tabs + root stack
-│       └── Navigator.ios       ← iOS tab bar + modal stack
+│       ├── Navigator.android   ← Material bottom tabs + root stack; Settings registered in every tab stack
+│       └── Navigator.ios       ← iOS tab bar + modal stack; Settings registered in every tab stack
 └── assets/                     ← icon.png, splash.png, adaptive-icon.png
 ```
 
