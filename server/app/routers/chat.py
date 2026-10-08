@@ -16,6 +16,14 @@ from ..models import ChatMessage, Setting, Track, User, utcnow
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
+_PLAY_WORDS = {"play", "start", "put on", "queue", "listen", "hear", "show me", "give me"}
+
+
+def _has_play_intent(text: str) -> bool:
+    t = text.lower()
+    return any(w in t for w in _PLAY_WORDS)
+
+
 MAX_HISTORY = 20
 MAX_TOOL_ROUNDS = 3
 HISTORY_TURNS = 12
@@ -186,6 +194,24 @@ def _run_conversation(
                     )
                 except HTTPException as exc:
                     result, action = {"error": exc.detail}, None
+                # Auto-play: if user asked to play and search returned tracks,
+                # fire play_tracks immediately without waiting for a second AI call.
+                if (
+                    call["name"] == "search_library"
+                    and action is None
+                    and result.get("count", 0) > 0
+                    and _has_play_intent(user_text)
+                ):
+                    track_ids = [t["id"] for t in result.get("tracks", [])]
+                    try:
+                        _, action = execute_tool(
+                            "play_tracks",
+                            {"track_ids": track_ids, "mode": "replace"},
+                            session,
+                            user_row,
+                        )
+                    except HTTPException:
+                        pass
                 if action is not None:
                     actions_log.append(action)
                     yield _sse("action", action)
