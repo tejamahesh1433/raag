@@ -62,4 +62,4 @@ AI_EMBED_MODEL = _env("MUSIC_AI_EMBED_MODEL", "nomic-embed-text")
 AI_TAG_MODEL = _env("MUSIC_AI_TAG_MODEL", "")
 
 VERSION = "0.3.2"
-APK_VERSION = "1.0.6"
+APK_VERSION = "1.0.7"
