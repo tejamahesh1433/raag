@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { getContentUriAsync } from "expo-file-system/legacy";
 import * as IntentLauncher from "expo-intent-launcher";
-import { File, Paths } from "expo-file-system/next";
+import { File, Paths } from "expo-file-system";
 import { APP_VERSION, getBaseUrl } from "../api";
 
 export type UpdateState = "idle" | "checking" | "available" | "downloading" | "installing" | "uptodate" | "error";
@@ -47,7 +47,7 @@ export function useAppUpdate() {
       const dest = new File(Paths.cache, "raag.apk");
       const downloaded = await File.downloadFileAsync(apkUrl, dest, {
         idempotent: true,
-        onProgress: ({ bytesWritten, totalBytes }) => {
+        onProgress: ({ bytesWritten, totalBytes }: { bytesWritten: number; totalBytes: number }) => {
           if (totalBytes > 0) setProgress(bytesWritten / totalBytes);
         },
       });
