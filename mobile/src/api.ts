@@ -11,7 +11,7 @@ const COOKIE_KEY = "raag_session_cookie";
 const QUALITY_KEY = "raag_stream_quality";
 
 export const DEFAULT_SERVER_URL = "https://music.tejainfo.xyz";
-export const APP_VERSION = "1.0.7";
+export const APP_VERSION = "1.0.8";
 
 export type StreamQuality = "original" | "high" | "medium" | "low";
 

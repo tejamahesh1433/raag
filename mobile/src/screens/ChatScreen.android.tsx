@@ -138,17 +138,15 @@ export function ChatScreen() {
     const extra = notices[String(item.id)] ?? [];
     return (
       <View style={[styles.bubbleRow, isUser ? styles.bubbleRowUser : styles.bubbleRowAssistant]}>
-        <View style={styles.bubbleColumn}>
-          {extra.map((n) => (
-            <Text key={n} style={styles.noticeText}>
-              {renderNotice(n)}
-            </Text>
-          ))}
-          <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
-            <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant]}>
-              {item.content}
-            </Text>
-          </View>
+        {extra.map((n) => (
+          <Text key={n} style={styles.noticeText}>
+            {renderNotice(n)}
+          </Text>
+        ))}
+        <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
+          <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant]}>
+            {item.content}
+          </Text>
         </View>
       </View>
     );
@@ -241,16 +239,12 @@ const styles = StyleSheet.create({
   },
   bubbleRow: {
     marginVertical: SPACING.xs,
-    flexDirection: "row",
   },
   bubbleRowUser: {
-    justifyContent: "flex-end",
+    alignItems: "flex-end",
   },
   bubbleRowAssistant: {
-    justifyContent: "flex-start",
-  },
-  bubbleColumn: {
-    maxWidth: "78%",
+    alignItems: "flex-start",
   },
   noticeText: {
     fontSize: 12,
