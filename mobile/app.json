@@ -47,6 +47,18 @@
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "942f3bf4-38b8-41bd-9725-5f98ee7989cb"
+      }
+    },
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/942f3bf4-38b8-41bd-9725-5f98ee7989cb",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     }
   }
 }
