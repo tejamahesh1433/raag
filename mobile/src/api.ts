@@ -12,7 +12,7 @@ const QUALITY_KEY = "raag_stream_quality";
 const DEVICE_ID_KEY = "raag_device_id";
 
 export const DEFAULT_SERVER_URL = "https://music.tejainfo.xyz";
-export const APP_VERSION = "1.0.9";
+export const APP_VERSION = "1.0.10";
 
 export type StreamQuality = "original" | "high" | "medium" | "low";
 
@@ -265,7 +265,7 @@ export const api = {
         xhr.onprogress = () => {
           const text: string = xhr.responseText ?? "";
           if (text.length > seen) {
-            parser.push(text.slice(seen));
+            try { parser.push(text.slice(seen)); } catch { /* ignore */ }
             seen = text.length;
           }
         };
@@ -284,8 +284,12 @@ export const api = {
           }
           if (status === 200) {
             // SSE bodies sometimes arrive only in full at onload (Hermes/JSC).
-            if (text.length > seen) parser.push(text.slice(seen));
-            parser.flush();
+            try {
+              if (text.length > seen) parser.push(text.slice(seen));
+              parser.flush();
+            } catch {
+              // swallow event-handler errors so resolve always fires
+            }
             resolve();
             return;
           }
