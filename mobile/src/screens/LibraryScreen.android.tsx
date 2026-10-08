@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AlbumCard } from "../components/AlbumCard.android";
@@ -21,6 +22,7 @@ type LibraryTab = "Artists" | "Albums" | "Tracks";
 const TABS: LibraryTab[] = ["Artists", "Albums", "Tracks"];
 
 export function LibraryScreen() {
+  const insets = useSafeAreaInsets();
   const navigation =
     useNavigation<NativeStackNavigationProp<LibraryStackParamList>>();
   const [activeTab, setActiveTab] = useState<LibraryTab>("Albums");
@@ -53,7 +55,7 @@ export function LibraryScreen() {
   for (const a of albums) albumsById[a.id] = a;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.tabRow}>
         {TABS.map((tab) => (
           <Pressable
@@ -187,7 +189,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   listContent: {
-    paddingBottom: SPACING.xl,
+    paddingBottom: 140,
   },
   artistRow: {
     flexDirection: "row",
