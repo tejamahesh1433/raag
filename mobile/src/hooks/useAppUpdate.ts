@@ -43,15 +43,19 @@ export function useAppUpdate() {
     setError(null);
     const apkUrl = `${getBaseUrl()}/downloads/raag.apk`;
     try {
-      const file = new File(Paths.cache, "raag.apk");
-      if (file.exists) file.delete();
+      // Use static File.downloadFileAsync with idempotent + progress
+      const dest = new File(Paths.cache, "raag.apk");
+      const downloaded = await File.downloadFileAsync(apkUrl, dest, {
+        idempotent: true,
+        onProgress: ({ bytesWritten, totalBytes }) => {
+          if (totalBytes > 0) setProgress(bytesWritten / totalBytes);
+        },
+      });
 
-      // New expo-file-system/next API — native download, no deprecated resumable
-      await file.downloadAsync(apkUrl);
       setProgress(1);
-
       setState("installing");
-      const contentUri = await FileSystem.getContentUriAsync(file.uri);
+
+      const contentUri = await FileSystem.getContentUriAsync(downloaded.uri);
       await IntentLauncher.startActivityAsync("android.intent.action.INSTALL_PACKAGE", {
         data: contentUri,
         flags: 1,

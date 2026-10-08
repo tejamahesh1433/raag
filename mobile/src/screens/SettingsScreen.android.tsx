@@ -182,7 +182,7 @@ export function SettingsScreen({ navigation }: Props) {
               <View style={styles.separator} />
               <View style={styles.row}>
                 <Text style={styles.rowLabel}>
-                  {updateState === "installing" ? "Installing…" : "Downloading…"}
+                  {updateState === "installing" ? "Installing…" : `Downloading… ${Math.round(dlProgress * 100)}%`}
                 </Text>
                 <ActivityIndicator size="small" color={COLORS.accent} />
               </View>
