@@ -108,7 +108,11 @@ def _mount_spa(app: FastAPI) -> None:
             filename = path[len("downloads/"):]
             dl_file = (downloads_dir / filename).resolve()
             if dl_file.is_relative_to(downloads_dir) and dl_file.is_file():
-                return FileResponse(dl_file, filename=filename)
+                return FileResponse(
+                    dl_file,
+                    filename=filename,
+                    headers={"Cache-Control": "no-store"},
+                )
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="File not found")
         if path.startswith("api/"):
