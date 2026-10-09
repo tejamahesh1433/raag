@@ -5,9 +5,10 @@ AI assistant powered by **Ollama or LM Studio** — no paid cloud, nothing leave
 
 📄 Spec: [`docs/specs/music-app-spec.md`](docs/specs/music-app-spec.md) ·
 Deploy: [`docs/deploy.md`](docs/deploy.md) ·
+Mobile Client: [`mobile/README.md`](mobile/README.md) ·
 Design demos: [`docs/design-demos/`](docs/design-demos/)
 
-**Version:** `0.3.2`
+**Version:** `1.0.15` (Server `0.3.2` · Mobile `1.0.15`)
 
 **Live:** [https://music.tejainfo.xyz](https://music.tejainfo.xyz) · LAN `http://192.168.4.43:8765` ·
 Repo: [tejamahesh1433/raag](https://github.com/tejamahesh1433/raag)
@@ -44,6 +45,9 @@ Repo: [tejamahesh1433/raag](https://github.com/tejamahesh1433/raag)
 ### App & access
 - ✅ **Open access** — no login by default (`MUSIC_AUTH_REQUIRED=0`)
 - ✅ **First-run wizard** — folders → scan → AI → remote-access checklist
+- ✅ **Native Mobile App (Android & iOS)** — Expo React Native client with Material Design 3 (Android) and Apple HIG (iOS)
+- ✅ **In-App APK Updater** — automatic check against `/api/health`, direct download, and seamless installation
+- ✅ **CDN Cache-Busting Download Page** — web download page displays version (`v1.0.15`), exact file size in MB and bytes, using `?v={version}` cache busting to bypass edge proxy caching
 - ✅ **Organize** — duplicates, MusicBrainz enrichment, AcoustID scan
 - ✅ **Settings** — library, schedule, transcode, AI, scrobble, Discord, AcoustID, EQ, backup/restore
 - ✅ **PWA** — installable shell; **offline track/album downloads** via Cache API

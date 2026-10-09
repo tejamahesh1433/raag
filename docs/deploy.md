@@ -81,7 +81,7 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 - Tunnel hostname → `http://music-server:8765` (Docker network)
 - DNS: `music.tejainfo.xyz` CNAME → `<tunnel-id>.cfargotunnel.com` (proxied)
 
-Health: `GET /api/health` → `{"status":"ok","version":"0.3.2",...}`
+Health: `GET /api/health` → `{"status":"ok","version":"0.3.2","apk_version":"1.0.15",...}`
 
 ### Auth note
 
@@ -137,12 +137,12 @@ The server redeploy (section 3) updates the backend and web app only. The mobile
 | Change | How it reaches phones |
 |---|---|
 | JavaScript only (screens, store, styles) | `cd mobile && npm run update -- --message "…"` (EAS Update, channel `production`) — no rebuild |
-| Native (permissions, icons, native modules) | New signed APK uploaded to the server's `downloads/` volume, then bump `APK_VERSION` in `server/app/config.py` and `APP_VERSION` in `mobile/src/api.ts` together; phones update via the in-app updater |
+| Native (permissions, icons, native modules) | New signed APK uploaded to the server's `downloads/` volume, then bump `APK_VERSION` in `server/app/config.py` and `APP_VERSION` in `mobile/src/api.ts` together; phones update via the in-app updater (uses `?v=<version>` query parameter and `no-cache` headers to bypass CDN caching) |
 | iOS | Rebuild with Xcode or `eas build --platform ios` |
 
 Details, rules and gotchas (runtime version, signing key, why `prebuild --clean` is dangerous): `mobile/README.md` → *Over-the-air updates*.
 
-`/api/health` reports `apk_version`; the in-app updater compares it with the app's `APP_VERSION`. Do not bump `APK_VERSION` before the matching APK is uploaded, or every phone will be offered an update that downloads the old file.
+`/api/health` reports `apk_version` (`1.0.15`); the in-app updater compares it with the app's `APP_VERSION`. Do not bump `APK_VERSION` before the matching APK is uploaded, or every phone will be offered an update that downloads the old file.
 
 ---
 

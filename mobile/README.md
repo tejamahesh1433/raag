@@ -34,7 +34,7 @@ Scan the QR code in Expo Go on your device.
 
 ## Building for distribution
 
-**Android build requirements:** Java 17 (Amazon Corretto 17 recommended), Gradle 9.3.1 (set in `gradle/wrapper/gradle-wrapper.properties`), minSdk 24 (Android 7+), targetSdk 36.
+**Android build requirements:** Java 17 (Amazon Corretto 17 recommended), Gradle 9.3.1 (set in `gradle/wrapper/gradle-wrapper.properties`), minSdk 24 (Android 7+), targetSdk 36. Note: `edgeToEdgeEnabled=false` in `gradle.properties` ensures stability and avoids `EdgeToEdgePackage` startup crashes on Android release builds.
 
 Do not distribute `android/app/build/outputs/apk/debug/app-debug.apk`. Debug APKs
 expect a Metro development server and will show "Unable to load script" when
@@ -47,7 +47,7 @@ cd android
 ./gradlew assembleRelease
 ```
 
-Install `android/app/build/outputs/apk/release/app-release.apk`.
+Install `android/app/build/outputs/apk/release/app-release.apk` (Current Release: **`1.0.15`**, ~42.86 MB).
 
 For managed cloud builds:
 
@@ -70,7 +70,7 @@ eas build --platform ios
 The `useAppUpdate` hook (in `src/hooks/useAppUpdate.ts`) checks the server for a newer APK and installs it without leaving the app:
 
 1. **Check** — GET `/api/health`; reads `apk_version` from the response and compares it against `APP_VERSION` in `src/api.ts`.
-2. **Download** — if the server version is higher, downloads `<serverUrl>/downloads/raag.apk` to the app's cache directory via `expo-file-system`.
+2. **Download** — if the server version is higher, downloads `<serverUrl>/downloads/raag.apk?v=<apk_version>` to the app's cache directory via `expo-file-system` (using `?v=<version>` to bypass CDN caching).
 3. **Install** — resolves a `content://` URI via `FileSystem.getContentUriAsync`, then launches the Android package installer via `expo-intent-launcher`.
 
 Android manifest requirements (already present): `REQUEST_INSTALL_PACKAGES` permission + a `FileProvider` entry pointing at `@xml/file_provider_paths`.
