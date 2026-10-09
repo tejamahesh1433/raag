@@ -110,12 +110,16 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   toggle: async () => {
     if (!_sound) return;
     const { playing } = get();
-    if (playing) {
-      _sound.pause();
+    try {
+      if (playing) {
+        _sound.pause();
+        set({ playing: false });
+      } else {
+        _sound.play();
+        set({ playing: true });
+      }
+    } catch {
       set({ playing: false });
-    } else {
-      _sound.play();
-      set({ playing: true });
     }
   },
 
@@ -164,8 +168,10 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   seekTo: async (seconds) => {
-    await _sound?.seekTo(seconds);
-    set({ position: seconds });
+    try {
+      await _sound?.seekTo(seconds);
+      set({ position: seconds });
+    } catch {}
   },
 
   toggleShuffle: () => set((s) => ({ shuffle: !s.shuffle })),
