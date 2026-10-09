@@ -118,7 +118,9 @@ def _action_track(t: Track) -> dict:
         "added_at": t.added_at.isoformat() if t.added_at else None,
         "album_id": t.album_id,
         "artist_id": t.artist_id,
+        "artwork_id": None,
         "is_favorite": False,
+        "mood": t.mood or "",
     }
 
 
