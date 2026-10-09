@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -11,10 +12,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { api } from "../api";
 import type { ChatMessage, Track } from "../types";
 import { usePlayer } from "../store/player";
-import { COLORS, FONT, RADIUS, SPACING } from "../theme/ios";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { COLORS, FONT, RADIUS, SHADOW, SPACING } from "../theme/ios";
 
 function messageKey(item: ChatMessage): string {
   return String(item.id);
@@ -36,11 +40,14 @@ export default function ChatScreen() {
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const currentTrack = usePlayer((s) => (s.index >= 0 ? s.queue[s.index] : null));
+  let tabBarHeight = 84;
+  try {
+    tabBarHeight = useBottomTabBarHeight();
+  } catch {}
 
   useEffect(() => {
     api.chatHistory()
       .then((history) => {
-        // newest-first for inverted FlatList
         const sorted = [...history].sort(
           (a, b) => messageTime(b) - messageTime(a),
         );
@@ -98,14 +105,14 @@ export default function ChatScreen() {
           });
         } else if (ev.event === "action") {
           const action = ev.data as unknown as {
-            type?: string;
-            mode?: string;
+            type: string;
             tracks?: Track[];
+            queue_only?: boolean;
             name?: string;
           };
-          if (action.type === "play" && Array.isArray(action.tracks)) {
-            const player = usePlayer.getState();
-            if (action.mode === "queue") {
+          const player = usePlayer.getState();
+          if (action.type === "play_tracks" && Array.isArray(action.tracks) && action.tracks.length) {
+            if (action.queue_only) {
               player.enqueue(action.tracks);
               appendNotice(draftKey, `+ Queued ${action.tracks.length} track(s)`);
             } else {
@@ -136,81 +143,135 @@ export default function ChatScreen() {
               {n}
             </Text>
           ))}
-          <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
-            <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant]}>
-              {item.content}
-            </Text>
-          </View>
+          {isUser ? (
+            <View style={styles.userBubbleShadow}>
+              <LinearGradient
+                colors={COLORS.accentGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.bubble, styles.bubbleUser]}
+              >
+                {/* Diagonal Gloss Sheen */}
+                <LinearGradient
+                  colors={["rgba(255, 255, 255, 0.35)", "transparent"]}
+                  style={styles.bubbleGloss}
+                  pointerEvents="none"
+                />
+                <Text style={styles.bubbleTextUser}>{item.content}</Text>
+              </LinearGradient>
+            </View>
+          ) : (
+            <View style={[styles.bubble, styles.bubbleAssistant]}>
+              <View style={styles.assistantRim} pointerEvents="none" />
+              <Text style={styles.bubbleTextAssistant}>{item.content}</Text>
+            </View>
+          )}
         </View>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <Text style={styles.largeTitle}>Chat</Text>
-      <KeyboardAvoidingView behavior="padding" style={styles.flex}>
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={COLORS.accent} />
-          </View>
-        ) : (
-          <FlatList
-            ref={listRef}
-            data={messages}
-            keyExtractor={messageKey}
-            renderItem={renderItem}
-            inverted
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        <SafeAreaView edges={["bottom"]} style={styles.inputContainer}>
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.input}
-              value={input}
-              onChangeText={setInput}
-              placeholder="Ask about your music…"
-              placeholderTextColor={COLORS.muted}
-              returnKeyType="send"
-              onSubmitEditing={handleSend}
-              multiline
+    <View style={styles.root}>
+      {/* Ambient background gradient */}
+      <LinearGradient
+        colors={["#160c1c", "#0a0910", "#030305"]}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.header}>
+          <Text style={styles.largeTitle}>Chat</Text>
+        </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
+          style={styles.flex}
+        >
+          {loading ? (
+            <View style={styles.center}>
+              <ActivityIndicator color={COLORS.accent} />
+            </View>
+          ) : (
+            <FlatList
+              ref={listRef}
+              data={messages}
+              keyExtractor={messageKey}
+              renderItem={renderItem}
+              inverted
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
             />
-            <TouchableOpacity
-              style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
-              onPress={handleSend}
-              disabled={!input.trim() || sending}
-            >
-              {sending ? (
-                <ActivityIndicator size="small" color={COLORS.onAccent} />
-              ) : (
-                <Ionicons name="arrow-up" size={18} color={COLORS.onAccent} />
-              )}
-            </TouchableOpacity>
+          )}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          {/* Frosted Glass Input Container */}
+          <View style={[styles.inputContainer, { marginBottom: tabBarHeight }]}>
+            <BlurView tint="dark" intensity={80} style={styles.inputBlur}>
+              <View style={styles.inputRim} pointerEvents="none" />
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  value={input}
+                  onChangeText={setInput}
+                  placeholder="Ask about your music…"
+                  placeholderTextColor={COLORS.muted}
+                  returnKeyType="send"
+                  onSubmitEditing={handleSend}
+                  multiline
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.sendBtn,
+                    (!input.trim() || sending) && styles.sendBtnDisabled,
+                  ]}
+                  onPress={handleSend}
+                  disabled={!input.trim() || sending}
+                >
+                  <LinearGradient
+                    colors={
+                      !input.trim() || sending
+                        ? ["#444", "#333"]
+                        : COLORS.accentGradient
+                    }
+                    style={StyleSheet.absoluteFill}
+                  />
+                  {sending ? (
+                    <ActivityIndicator size="small" color={COLORS.onAccent} />
+                  ) : (
+                    <Ionicons name="arrow-up" size={18} color={COLORS.onAccent} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </BlurView>
           </View>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  root: {
     flex: 1,
     backgroundColor: COLORS.bg,
   },
+  safe: {
+    flex: 1,
+  },
   flex: {
     flex: 1,
+  },
+  header: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xs,
   },
   largeTitle: {
     fontSize: 34,
     fontWeight: "700",
     color: COLORS.label,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-    paddingBottom: SPACING.xs,
+    letterSpacing: -0.4,
   },
   center: {
     flex: 1,
@@ -220,6 +281,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
+    paddingBottom: 20,
   },
   bubbleRow: {
     marginVertical: SPACING.xs,
@@ -232,7 +294,11 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   bubbleColumn: {
-    maxWidth: "78%",
+    maxWidth: "80%",
+  },
+  userBubbleShadow: {
+    ...SHADOW.glow(COLORS.accent),
+    borderRadius: RADIUS.lg,
   },
   noticeText: {
     fontSize: 12,
@@ -248,56 +314,81 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xs,
   },
   bubble: {
-    maxWidth: "78%",
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.lg,
+    position: "relative",
+    overflow: "hidden",
   },
   bubbleUser: {
-    backgroundColor: COLORS.accent,
-    borderBottomRightRadius: RADIUS.sm,
+    borderBottomRightRadius: RADIUS.xs,
+  },
+  bubbleGloss: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 14,
   },
   bubbleAssistant: {
-    backgroundColor: COLORS.surfaceSecondary,
-    borderBottomLeftRadius: RADIUS.sm,
+    backgroundColor: "rgba(38, 38, 48, 0.72)",
+    borderBottomLeftRadius: RADIUS.xs,
+    ...SHADOW.card,
   },
-  bubbleText: {
-    fontSize: FONT.body,
-    lineHeight: 22,
+  assistantRim: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: RADIUS.lg,
+    borderBottomLeftRadius: RADIUS.xs,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderTopColor: "rgba(255, 255, 255, 0.28)",
   },
   bubbleTextUser: {
     color: COLORS.onAccent,
+    fontSize: FONT.body,
+    lineHeight: 22,
   },
   bubbleTextAssistant: {
     color: COLORS.label,
+    fontSize: FONT.body,
+    lineHeight: 22,
   },
   inputContainer: {
-    backgroundColor: COLORS.bg,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: COLORS.separator,
+  },
+  inputBlur: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    backgroundColor: "rgba(18, 18, 24, 0.85)",
+  },
+  inputRim: {
+    ...StyleSheet.absoluteFill,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.10)",
   },
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
     gap: SPACING.sm,
   },
   input: {
     flex: 1,
-    backgroundColor: COLORS.surfaceSecondary,
+    backgroundColor: "rgba(42, 42, 54, 0.65)",
     borderRadius: RADIUS.xl,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     fontSize: FONT.body,
     color: COLORS.label,
     maxHeight: 120,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.10)",
   },
   sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.accent,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
   },

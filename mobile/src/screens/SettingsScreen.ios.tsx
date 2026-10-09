@@ -11,7 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { api, getBaseUrl, setBaseUrl } from "../api";
+import { api, getBaseUrl, getStreamQuality, setBaseUrl, setStreamQuality, type StreamQuality } from "../api";
 import { useAuth } from "../store/auth";
 import { COLORS, FONT, RADIUS, SPACING } from "../theme/ios";
 
@@ -19,14 +19,15 @@ interface Props {
   navigation: NativeStackNavigationProp<any>;
 }
 
-type Quality = "original" | "high" | "medium" | "low";
-const QUALITY_OPTIONS: Quality[] = ["original", "high", "medium", "low"];
+const QUALITY_OPTIONS: StreamQuality[] = ["original", "high", "medium", "low"];
 
 export default function SettingsScreen({ navigation }: Props) {
-  const { user, logout } = useAuth();
+  const { user, login, logout } = useAuth();
+  // Open-access connect: master's login() falls back to api.me() when credentials are empty.
+  const loginDirectly = (url: string) => login(url, "", "");
   const [serverUrl, setServerUrl] = useState(getBaseUrl);
   const [serverStatus, setServerStatus] = useState<"checking" | "ok" | "error">("checking");
-  const [quality, setQuality] = useState<Quality>("original");
+  const [quality, setQuality] = useState<StreamQuality>(getStreamQuality);
 
   useEffect(() => {
     checkServer();
@@ -50,6 +51,7 @@ export default function SettingsScreen({ navigation }: Props) {
         if (!url?.trim()) return;
         await setBaseUrl(url.trim());
         setServerUrl(url.trim());
+        await loginDirectly(url.trim());
         checkServer();
       },
       "plain-text",
@@ -64,24 +66,35 @@ export default function SettingsScreen({ navigation }: Props) {
         options: [...QUALITY_OPTIONS, "Cancel"],
         cancelButtonIndex: QUALITY_OPTIONS.length,
       },
-      (idx) => {
-        if (idx < QUALITY_OPTIONS.length) setQuality(QUALITY_OPTIONS[idx]);
+      async (idx) => {
+        if (idx < QUALITY_OPTIONS.length) {
+          const selected = QUALITY_OPTIONS[idx];
+          await setStreamQuality(selected);
+          setQuality(selected);
+        }
       },
     );
   }
 
   function handleLogout() {
-    Alert.alert("Log Out", "Are you sure?", [
+    Alert.alert("Reset Session", "This will reset your session and reconnect as guest.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Log Out", style: "destructive", onPress: () => logout() },
+      {
+        text: "Reset",
+        style: "destructive",
+        onPress: async () => {
+          await logout();
+          checkServer();
+        },
+      },
     ]);
   }
 
   const statusIcon = serverStatus === "ok"
-    ? { name: "checkmark.circle.fill" as any, color: "#30d158" }
+    ? { name: "checkmark-circle" as any, color: "#30d158" }
     : serverStatus === "error"
-      ? { name: "xmark.circle.fill" as any, color: COLORS.accent }
-      : { name: "circle" as any, color: COLORS.muted };
+      ? { name: "close-circle" as any, color: COLORS.accent }
+      : { name: "ellipse-outline" as any, color: COLORS.muted };
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -139,11 +152,24 @@ export default function SettingsScreen({ navigation }: Props) {
         <View style={styles.group}>
           <View style={styles.row}>
             <Text style={styles.rowLabel}>Username</Text>
-            <Text style={styles.rowValue}>{user?.username ?? "—"}</Text>
+            <Text style={styles.rowValue}>{user?.username ?? "guest"}</Text>
           </View>
           <View style={styles.separator} />
+          <TouchableOpacity
+            style={styles.row}
+            onPress={async () => {
+              await loginDirectly(serverUrl);
+              checkServer();
+              Alert.alert("Connected", "Direct login refreshed successfully.");
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.rowLabel, { color: COLORS.accent }]}>Direct Login / Reconnect</Text>
+            <Ionicons name="refresh" size={16} color={COLORS.accent} />
+          </TouchableOpacity>
+          <View style={styles.separator} />
           <TouchableOpacity style={styles.row} onPress={handleLogout} activeOpacity={0.7}>
-            <Text style={[styles.rowLabel, { color: COLORS.accent }]}>Log Out</Text>
+            <Text style={[styles.rowLabel, { color: COLORS.muted }]}>Reset Session</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
