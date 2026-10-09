@@ -45,6 +45,11 @@ export function DownloadPage() {
               <div className="mb-1 flex items-center gap-2">
                 <AndroidIcon />
                 <h2 className="text-base font-semibold text-ink">Android</h2>
+                {apk?.version && (
+                  <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-semibold text-accent">
+                    v{apk.version}
+                  </span>
+                )}
               </div>
 
               {apk?.available ? (
@@ -59,9 +64,14 @@ export function DownloadPage() {
                     className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
                   >
                     <IconDownload size={16} />
-                    Download APK{apk.size_mb ? ` · ${apk.size_mb} MB` : ""}
+                    Download APK{apk.size_mb ? ` · ${apk.size_mb.toFixed(2)} MB` : ""}
                   </a>
-                  <p className="mt-3 text-xs text-muted/70">
+                  {apk.size_bytes && (
+                    <p className="mt-2 text-xs font-mono text-muted/80">
+                      Exact Size: {apk.size_mb?.toFixed(2)} MB ({apk.size_bytes.toLocaleString()} bytes)
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-muted/70">
                     Settings → Apps → Install unknown apps → allow your browser
                   </p>
                 </>

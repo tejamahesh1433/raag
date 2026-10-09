@@ -208,11 +208,15 @@ def get_job(
 def downloads_manifest():
     """Return which app builds are available for download."""
     apk_path = config.DATA_DIR / "downloads" / "raag.apk"
+    exists = apk_path.exists()
+    st_size = apk_path.stat().st_size if exists else 0
     return {
         "android": {
-            "available": apk_path.exists(),
-            "url": "/downloads/raag.apk" if apk_path.exists() else None,
-            "size_mb": round(apk_path.stat().st_size / 1_048_576, 1) if apk_path.exists() else None,
+            "available": exists,
+            "url": "/downloads/raag.apk" if exists else None,
+            "size_mb": round(st_size / 1_048_576, 2) if exists else None,
+            "size_bytes": st_size if exists else None,
+            "version": config.APK_VERSION,
         }
     }
 
