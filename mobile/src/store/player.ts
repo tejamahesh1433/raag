@@ -52,9 +52,9 @@ async function _ensureAudioMode(): Promise<void> {
   }
 }
 
-function _getOrCreatePlayer(): AudioPlayer {
+function _getOrCreatePlayer(firstTrack: Track): AudioPlayer {
   if (!_sound) {
-    const p = createAudioPlayer(null, { updateInterval: 500 });
+    const p = createAudioPlayer(api.streamSource(firstTrack.id), { updateInterval: 500 });
     p.addListener("playbackStatusUpdate", (status: AudioStatus) => {
       if (!status.isLoaded) return;
       usePlayer.setState({
@@ -73,12 +73,12 @@ function _getOrCreatePlayer(): AudioPlayer {
 
 async function _playTrack(track: Track): Promise<void> {
   await _ensureAudioMode();
-  const player = _getOrCreatePlayer();
+  const player = _getOrCreatePlayer(track);
   // replace() atomically swaps the source — old audio stops immediately
   player.replace(api.streamSource(track.id));
   player.play();
   usePlayer.setState({ playing: true, loading: false });
-  api.recordPlayed(track.id).catch(() => {});
+  void api.recordPlayed(track.id).catch(() => {});
 }
 
 export const usePlayer = create<PlayerState>((set, get) => ({
