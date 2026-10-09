@@ -60,7 +60,7 @@ export function DownloadPage() {
                   </p>
                   <a
                     href={apk.url!}
-                    download="raag.apk"
+                    download={`raag-v${apk.version || '1.0.15'}.apk`}
                     className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
                   >
                     <IconDownload size={16} />
@@ -97,7 +97,7 @@ export function DownloadPage() {
 
             {apk?.available && (
               <div className="hidden shrink-0 sm:block">
-                <QrCode url={`${appBaseUrl}/downloads/raag.apk`} />
+                <QrCode url={`${appBaseUrl}${apk.url || '/downloads/raag.apk'}`} />
                 <p className="mt-2 text-center text-[11px] text-muted">Scan to download</p>
               </div>
             )}

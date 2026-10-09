@@ -3,7 +3,7 @@ import mimetypes
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -90,6 +90,23 @@ def create_app() -> FastAPI:
     app.include_router(ai_tags.router)
     downloads_dir = config.DATA_DIR / "downloads"
     downloads_dir.mkdir(parents=True, exist_ok=True)
+
+    @app.get("/downloads/raag.apk", include_in_schema=False)
+    async def download_apk():
+        apk_path = downloads_dir / "raag.apk"
+        if not apk_path.exists():
+            raise HTTPException(status_code=404, detail="APK not found")
+        return FileResponse(
+            apk_path,
+            media_type="application/vnd.android.package-archive",
+            filename=f"raag-v{config.APK_VERSION}.apk",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
     app.mount("/downloads", StaticFiles(directory=downloads_dir), name="downloads")
 
     _mount_spa(app)

@@ -213,7 +213,7 @@ def downloads_manifest():
     return {
         "android": {
             "available": exists,
-            "url": "/downloads/raag.apk" if exists else None,
+            "url": f"/downloads/raag.apk?v={config.APK_VERSION}" if exists else None,
             "size_mb": round(st_size / 1_048_576, 2) if exists else None,
             "size_bytes": st_size if exists else None,
             "version": config.APK_VERSION,
