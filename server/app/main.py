@@ -1,4 +1,5 @@
 """FastAPI application entry point."""
+import mimetypes
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -6,6 +7,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
+mimetypes.add_type("application/vnd.android.package-archive", ".apk")
 
 from . import config
 from .db import SessionLocal, init_db

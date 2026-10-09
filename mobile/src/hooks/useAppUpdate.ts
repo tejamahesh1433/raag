@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { cacheDirectory, createDownloadResumable, getContentUriAsync } from "expo-file-system/legacy";
+import { cacheDirectory, createDownloadResumable, deleteAsync, getContentUriAsync } from "expo-file-system/legacy";
 import * as IntentLauncher from "expo-intent-launcher";
 import { APP_VERSION, getBaseUrl } from "../api";
 
@@ -43,6 +43,7 @@ export function useAppUpdate() {
     const apkUrl = `${getBaseUrl()}/downloads/raag.apk`;
     const dest = `${cacheDirectory}raag.apk`;
     try {
+      await deleteAsync(dest, { idempotent: true }).catch(() => {});
       const dl = createDownloadResumable(
         apkUrl,
         dest,
