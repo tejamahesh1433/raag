@@ -1,14 +1,8 @@
 import { useState } from "react";
 import { Platform } from "react-native";
 import { cacheDirectory, createDownloadResumable, deleteAsync, getContentUriAsync } from "expo-file-system/legacy";
+import * as IntentLauncher from "expo-intent-launcher";
 import { APP_VERSION, getBaseUrl } from "../api";
-
-let IntentLauncher: any = null;
-if (Platform.OS === "android") {
-  try {
-    IntentLauncher = require("expo-intent-launcher");
-  } catch {}
-}
 
 export type UpdateState = "idle" | "checking" | "available" | "downloading" | "installing" | "uptodate" | "error";
 
@@ -67,7 +61,7 @@ export function useAppUpdate() {
       setProgress(1);
       setState("installing");
 
-      if (Platform.OS === "android" && IntentLauncher) {
+      if (Platform.OS === "android") {
         const contentUri = await getContentUriAsync(result.uri);
         await IntentLauncher.startActivityAsync("android.intent.action.INSTALL_PACKAGE", {
           data: contentUri,
