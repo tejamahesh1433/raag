@@ -6,6 +6,8 @@ __pycache__/
 
 # Data / media (never commit personal library or DB)
 data/
+downloads/
+library/
 *.db
 *.db-wal
 *.db-shm
