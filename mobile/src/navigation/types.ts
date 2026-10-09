@@ -27,11 +27,13 @@ export type SearchStackParamList = {
   Search: undefined;
   ArtistDetail: { artistId: number; artistName: string };
   AlbumDetail: { albumId: number };
+  Settings: undefined;
 };
 
 export type PlaylistsStackParamList = {
   Playlists: undefined;
   PlaylistDetail: { playlistId: number };
+  Settings: undefined;
 };
 
 export type RootStackParamList = {

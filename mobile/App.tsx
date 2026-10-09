@@ -4,7 +4,7 @@
  * iOS     → Navigator.ios.tsx     (Apple HIG)
  */
 import { useEffect } from "react";
-import { Platform, View } from "react-native";
+import { LogBox, Platform, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -13,11 +13,12 @@ import { initApi } from "./src/api";
 import { useAuth } from "./src/store/auth";
 import { ConnectScreen } from "./src/screens/ConnectScreen";
 
-// Platform-specific navigation bundles
-const AppNavigator =
-  Platform.OS === "ios"
-    ? require("./src/navigation/Navigator.ios").default
-    : require("./src/navigation/Navigator.android").default;
+LogBox.ignoreLogs([
+  "Cannot connect to Expo CLI",
+  "Disconnected from Metro",
+]);
+
+import AppNavigator from "./src/navigation/Navigator";
 
 const DARK_THEME = {
   dark: true,
