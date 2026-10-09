@@ -17,3 +17,5 @@ android/app/debug.keystore
 .DS_Store
 Thumbs.db
 *.log
+kotlin-compiler-*
+*.tmp
