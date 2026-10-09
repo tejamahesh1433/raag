@@ -110,9 +110,7 @@ def get_settings(db: DbSession = Depends(get_db), user: User = Depends(get_curre
 _SSRF_BLOCKED_NETS = [
     ipaddress.ip_network(n)
     for n in (
-        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
-        "127.0.0.0/8", "169.254.0.0/16",
-        "::1/128", "fc00::/7", "fe80::/10",
+        "169.254.169.254/32",  # Cloud metadata service (AWS/GCP/Azure)
     )
 ]
 

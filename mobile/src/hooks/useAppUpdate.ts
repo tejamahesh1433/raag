@@ -52,8 +52,11 @@ export function useAppUpdate() {
     try {
       // Use static File.downloadFileAsync with idempotent + progress
       const dest = new File(Paths.cache, "raag.apk");
+      if (dest.exists) {
+        dest.delete();
+      }
       const downloaded = await File.downloadFileAsync(apkUrl, dest, {
-        idempotent: true,
+        idempotent: false,
         onProgress: ({ bytesWritten, totalBytes }: { bytesWritten: number; totalBytes: number }) => {
           if (totalBytes > 0) setProgress(bytesWritten / totalBytes);
         },

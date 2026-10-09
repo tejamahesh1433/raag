@@ -112,7 +112,11 @@ def _mount_spa(app: FastAPI) -> None:
                 return FileResponse(
                     dl_file,
                     filename=filename,
-                    headers={"Cache-Control": "no-store"},
+                    media_type="application/vnd.android.package-archive",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "Accept-Ranges": "bytes",
+                    },
                 )
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="File not found")

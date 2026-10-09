@@ -27,6 +27,7 @@
         "backgroundColor": "#14241c"
       },
       "package": "xyz.tejainfo.raag",
+      "versionCode": 11,
       "permissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.WAKE_LOCK"
@@ -56,6 +57,8 @@
     "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/942f3bf4-38b8-41bd-9725-5f98ee7989cb",
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD",
       "requestHeaders": {
         "expo-channel-name": "production"
       }
