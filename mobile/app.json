@@ -2,7 +2,7 @@
   "expo": {
     "name": "Raag",
     "slug": "raag-music",
-    "version": "1.0.14",
+    "version": "1.0.15",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -27,7 +27,7 @@
         "backgroundColor": "#14241c"
       },
       "package": "xyz.tejainfo.raag",
-      "versionCode": 14,
+      "versionCode": 15,
       "permissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.WAKE_LOCK"
