@@ -8,6 +8,8 @@ import { create } from "zustand";
 import { api } from "../api";
 import type { Track } from "../types";
 
+// Single persistent player — replace() swaps the track without destroy/recreate,
+// which avoids Android issues where remove() doesn't immediately stop audio.
 let _sound: AudioPlayer | null = null;
 let _audioModeSet = false;
 
@@ -37,18 +39,7 @@ interface PlayerState {
   stop: () => void;
 }
 
-async function _stopCurrent(): Promise<void> {
-  if (_sound) {
-    try {
-      _sound.pause();
-      _sound.remove();
-    } catch {}
-    _sound = null;
-  }
-}
-
-async function _playTrack(track: Track): Promise<void> {
-  await _stopCurrent();
+async function _ensureAudioMode(): Promise<void> {
   if (!_audioModeSet) {
     try {
       await setAudioModeAsync({
@@ -59,20 +50,33 @@ async function _playTrack(track: Track): Promise<void> {
       _audioModeSet = true;
     } catch {}
   }
-  const sound = createAudioPlayer(api.streamSource(track.id), { updateInterval: 500 });
-  sound.addListener("playbackStatusUpdate", (status: AudioStatus) => {
-    if (!status.isLoaded) return;
-    usePlayer.setState({
-      position: status.currentTime,
-      duration: status.duration,
-      loading: status.isBuffering,
+}
+
+function _getOrCreatePlayer(): AudioPlayer {
+  if (!_sound) {
+    const p = createAudioPlayer(null, { updateInterval: 500 });
+    p.addListener("playbackStatusUpdate", (status: AudioStatus) => {
+      if (!status.isLoaded) return;
+      usePlayer.setState({
+        position: status.currentTime,
+        duration: status.duration,
+        loading: status.isBuffering,
+      });
+      if (status.didJustFinish) {
+        usePlayer.getState().next();
+      }
     });
-    if (status.didJustFinish) {
-      usePlayer.getState().next();
-    }
-  });
-  _sound = sound;
-  sound.play();
+    _sound = p;
+  }
+  return _sound;
+}
+
+async function _playTrack(track: Track): Promise<void> {
+  await _ensureAudioMode();
+  const player = _getOrCreatePlayer();
+  // replace() atomically swaps the source — old audio stops immediately
+  player.replace(api.streamSource(track.id));
+  player.play();
   usePlayer.setState({ playing: true, loading: false });
   api.recordPlayed(track.id).catch(() => {});
 }
@@ -171,7 +175,9 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   stop: () => {
-    _stopCurrent();
+    if (_sound) {
+      try { _sound.pause(); } catch {}
+    }
     set({ queue: [], index: -1, playing: false, loading: false, position: 0, duration: 0 });
   },
 
