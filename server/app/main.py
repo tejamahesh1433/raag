@@ -85,41 +85,24 @@ def create_app() -> FastAPI:
     app.include_router(subsonic.router)
     app.include_router(sync.router)
     app.include_router(ai_tags.router)
+    downloads_dir = config.DATA_DIR / "downloads"
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/downloads", StaticFiles(directory=downloads_dir), name="downloads")
+
     _mount_spa(app)
     return app
 
 
-
 def _mount_spa(app: FastAPI) -> None:
-    """Serve the built frontend with SPA fallback (registered after /api routes)."""
+    """Serve the built frontend with SPA fallback (registered after /api & /downloads routes)."""
     if not WEB_DIST.is_dir():
         return
 
     if (WEB_DIST / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
 
-    downloads_dir = config.DATA_DIR / "downloads"
-    downloads_dir.mkdir(parents=True, exist_ok=True)
-
     @app.get("/{path:path}", include_in_schema=False)
-    def spa_fallback(path: str):
-        # Downloads are served from the persistent data volume, not web/dist.
-        # Handle this here because app.mount() loses the race against /{path:path}.
-        if path.startswith("downloads/"):
-            filename = path[len("downloads/"):]
-            dl_file = (downloads_dir / filename).resolve()
-            if dl_file.is_relative_to(downloads_dir) and dl_file.is_file():
-                return FileResponse(
-                    dl_file,
-                    filename=filename,
-                    media_type="application/vnd.android.package-archive",
-                    headers={
-                        "Cache-Control": "no-cache",
-                        "Accept-Ranges": "bytes",
-                    },
-                )
-            from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail="File not found")
+    async def spa_fallback(path: str):
         if path.startswith("api/"):
             return FileResponse(WEB_DIST / "index.html")  # unknown API route -> SPA
         target = (WEB_DIST / path).resolve()
