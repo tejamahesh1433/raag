@@ -1,15 +1,7 @@
 import { useState } from "react";
-import { getContentUriAsync } from "expo-file-system/legacy";
-import { File, Paths } from "expo-file-system";
-import { Platform } from "react-native";
+import { cacheDirectory, createDownloadResumable, getContentUriAsync } from "expo-file-system/legacy";
+import * as IntentLauncher from "expo-intent-launcher";
 import { APP_VERSION, getBaseUrl } from "../api";
-
-let IntentLauncher: any = null;
-if (Platform.OS === "android") {
-  try {
-    IntentLauncher = require("expo-intent-launcher");
-  } catch {}
-}
 
 export type UpdateState = "idle" | "checking" | "available" | "downloading" | "installing" | "uptodate" | "error";
 
@@ -49,23 +41,25 @@ export function useAppUpdate() {
     setProgress(0);
     setError(null);
     const apkUrl = `${getBaseUrl()}/downloads/raag.apk`;
+    const dest = `${cacheDirectory}raag.apk`;
     try {
-      // Use static File.downloadFileAsync with idempotent + progress
-      const dest = new File(Paths.cache, "raag.apk");
-      if (dest.exists) {
-        dest.delete();
-      }
-      const downloaded = await File.downloadFileAsync(apkUrl, dest, {
-        idempotent: false,
-        onProgress: ({ bytesWritten, totalBytes }: { bytesWritten: number; totalBytes: number }) => {
-          if (totalBytes > 0) setProgress(bytesWritten / totalBytes);
-        },
-      });
+      const dl = createDownloadResumable(
+        apkUrl,
+        dest,
+        {},
+        ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
+          if (totalBytesExpectedToWrite > 0) {
+            setProgress(totalBytesWritten / totalBytesExpectedToWrite);
+          }
+        }
+      );
+      const result = await dl.downloadAsync();
+      if (!result?.uri) throw new Error("Download failed");
 
       setProgress(1);
       setState("installing");
 
-      const contentUri = await getContentUriAsync(downloaded.uri);
+      const contentUri = await getContentUriAsync(result.uri);
       await IntentLauncher.startActivityAsync("android.intent.action.INSTALL_PACKAGE", {
         data: contentUri,
         flags: 1,
