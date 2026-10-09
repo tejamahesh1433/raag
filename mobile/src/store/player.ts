@@ -63,7 +63,7 @@ function _getOrCreatePlayer(firstTrack: Track): AudioPlayer {
         loading: status.isBuffering,
       });
       if (status.didJustFinish) {
-        usePlayer.getState().next();
+        usePlayer.getState().next().catch(() => {});
       }
     });
     _sound = p;
@@ -122,33 +122,45 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   next: async () => {
     const { queue, index, repeat, shuffle } = get();
     if (!queue.length) return;
-    if (repeat === "one") {
-      await _playTrack(queue[index]);
-      return;
+    try {
+      if (repeat === "one") {
+        await _playTrack(queue[index]);
+        return;
+      }
+      let next = shuffle ? Math.floor(Math.random() * queue.length) : index + 1;
+      if (next >= queue.length) {
+        if (repeat === "all") next = 0;
+        else { set({ playing: false }); return; }
+      }
+      set({ index: next, loading: true, position: 0 });
+      await _playTrack(queue[next]);
+    } catch {
+      set({ playing: false, loading: false });
     }
-    let next = shuffle ? Math.floor(Math.random() * queue.length) : index + 1;
-    if (next >= queue.length) {
-      if (repeat === "all") next = 0;
-      else { set({ playing: false }); return; }
-    }
-    set({ index: next, loading: true, position: 0 });
-    await _playTrack(queue[next]);
   },
 
   prev: async () => {
     const { queue, index, position } = get();
     if (!queue.length) return;
-    if (position > 3) { await _sound?.seekTo(0); return; }
-    const prev = Math.max(0, index - 1);
-    set({ index: prev, loading: true, position: 0 });
-    await _playTrack(queue[prev]);
+    try {
+      if (position > 3) { await _sound?.seekTo(0); return; }
+      const prev = Math.max(0, index - 1);
+      set({ index: prev, loading: true, position: 0 });
+      await _playTrack(queue[prev]);
+    } catch {
+      set({ playing: false, loading: false });
+    }
   },
 
   jumpTo: async (idx) => {
     const { queue } = get();
     if (idx < 0 || idx >= queue.length) return;
-    set({ index: idx, loading: true, position: 0 });
-    await _playTrack(queue[idx]);
+    try {
+      set({ index: idx, loading: true, position: 0 });
+      await _playTrack(queue[idx]);
+    } catch {
+      set({ playing: false, loading: false });
+    }
   },
 
   seekTo: async (seconds) => {
