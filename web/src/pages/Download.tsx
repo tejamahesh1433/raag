@@ -4,7 +4,7 @@ import { PageHeader } from "../components/ui";
 import { IconDownload } from "../components/icons";
 
 interface DownloadsManifest {
-  android: { available: boolean; url: string | null; size_mb: number | null };
+  android: { available: boolean; url: string | null; size_mb: number | null; size_bytes?: number | null; version?: string };
 }
 
 function QrCode({ url }: { url: string }) {
